@@ -36,9 +36,11 @@ interface BoardStore {
   act: (a: Action, sentLabel?: string) => Promise<boolean>;
 }
 
+// ?lang=en&theme=light in the URL wins over the remembered choice
 const saved = <T extends string>(key: string, fallback: T): T => {
   try {
-    return (localStorage.getItem(key) as T) || fallback;
+    const fromUrl = new URLSearchParams(location.search).get(key.replace(/^cb\./, ''));
+    return (fromUrl as T) || (localStorage.getItem(key) as T) || fallback;
   } catch {
     return fallback;
   }
