@@ -31,13 +31,13 @@
   },
   "scripts": {
     "dev": "concurrently -k -n engine,ui \"node --watch-path=src --import tsx src/cli.ts serve --no-open --port 4317\" \"vite\"",
-    "build": "npm run build:ui && npm run build:cli",
+    "build": "npm run build:cli && npm run build:ui",
     "build:ui": "vite build",
     "build:cli": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p ui/tsconfig.json",
     "test": "vitest run",
     "demo": "node dist/cli.js demo",
-    "prepare": "npm run build"
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@hono/node-server": "^2.1.5",

@@ -140,6 +140,8 @@ npm test
 npm run build
 ```
 
+مجلد `dist/` محفوظ في المستودع حتى يعمل التثبيت من GitHub بدون أي بناء، لذلك شغّل `npm run build` قبل كل commit يغيّر الكود.
+
 البنية: `src/core` (الحالة والانتقالات والقفل والملخص و git والتوكنز)، و `src/server` (Hono مع SSE)، و `src/mcp` (الأدوات الأربع)، و `src/hooks`، و `ui/` (React Flow مع Zustand و Tailwind).
 
 </div>
@@ -205,7 +207,7 @@ Claude Code launches the `board` MCP server, which also hosts the board at `http
 
 ### Development
 
-`npm install`, then `npm run dev` (engine on 4317 plus Vite), `npm test` (unit tests and an end-to-end MCP/HTTP/SSE/hooks suite), and `npm run build`.
+`dist/` is committed so installing from GitHub needs no build step; run `npm run build` before committing code changes. `npm install`, then `npm run dev` (engine on 4317 plus Vite), `npm test` (unit tests and an end-to-end MCP/HTTP/SSE/hooks suite), and `npm run build`.
 
 ## License
 
