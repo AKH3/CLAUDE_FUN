@@ -32,6 +32,8 @@ flowchart LR
 ## البدء السريع
 
 > جديد على الطرفية أو Claude Code؟ ابدأ من [دليل التشغيل للمبتدئين](docs/GUIDE-ar.md).
+>
+> أو دع كلاود يثبّتها لك: انسخ المجلد [`skills/claude-board-setup`](skills/claude-board-setup) إلى `~/.claude/skills/`، ثم قل لكلاود داخل مشروعك «ثبّت لوحة كلاود».
 
 ```bash
 npm i -g https://github.com/AKH3/CLAUDE_FUN/archive/refs/heads/main.tar.gz
