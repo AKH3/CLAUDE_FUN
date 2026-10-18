@@ -18,6 +18,8 @@ ${SNIPPET_END}
 
 const HOOK_MARK = /claude-fun|claude-board|cli\.(m?js|ts)/;
 const BOARD_TOOLS = 'mcp__board';
+const GUARD_MATCHER = 'Edit|Write|MultiEdit|NotebookEdit|Bash';
+const MCP_TIMEOUT_MS = '600000';
 
 export interface InitOptions {
   name?: string;
@@ -81,6 +83,12 @@ export function init(root: string, opts: InitOptions = {}): string[] {
   settings.enabledMcpjsonServers = [...new Set([...(settings.enabledMcpjsonServers ?? []), 'board'])];
   settings.permissions ??= {};
   settings.permissions.allow = [...new Set([...(settings.permissions.allow ?? []), BOARD_TOOLS])];
+  // `await` long-polls while you review on the board; give MCP calls 10 minutes unless already set
+  settings.env ??= {};
+  if (!settings.env.MCP_TOOL_TIMEOUT) {
+    settings.env.MCP_TOOL_TIMEOUT = MCP_TIMEOUT_MS;
+    report.push(`+ .claude/settings.json → env MCP_TOOL_TIMEOUT=${MCP_TIMEOUT_MS}`);
+  }
 
   if (opts.hooks !== false) {
     settings.hooks ??= {};
@@ -93,7 +101,7 @@ export function init(root: string, opts: InitOptions = {}): string[] {
     };
     put('SessionStart', 'session-start');
     put('UserPromptSubmit', 'prompt');
-    put('PreToolUse', 'guard', 'Edit|Write|MultiEdit|NotebookEdit');
+    put('PreToolUse', 'guard', GUARD_MATCHER);
     report.push('+ .claude/settings.json → hooks (session-start, prompt, guard) + allow mcp__board');
   } else {
     report.push('+ .claude/settings.json → allow mcp__board');

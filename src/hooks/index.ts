@@ -13,7 +13,7 @@ interface HookInput {
   cwd?: string;
   hook_event_name?: string;
   tool_name?: string;
-  tool_input?: { file_path?: string; notebook_path?: string; path?: string };
+  tool_input?: { file_path?: string; notebook_path?: string; path?: string; command?: string };
 }
 
 async function readStdin(): Promise<HookInput> {
@@ -56,19 +56,57 @@ export function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${re}$`, 'i');
 }
 
-export function guardDecision(state: State, root: string, file: string | undefined): string | undefined {
+// Shell commands that change files. A heuristic, not a sandbox: it catches the
+// usual ways (redirects, sed -i, rm/mv/cp, git that rewrites the tree, package
+// installs, PowerShell file cmdlets) so Claude can't sidestep Edit/Write.
+const SHELL_WRITES: RegExp[] = [
+  /(^|[^0-9&<>=-])>>?\s*(?!&|\/dev\/null\b|nul\b|\$null\b)[^\s|&;]/i,
+  /\btee\b/,
+  /\b(sed|perl)\b[^|;&]*\s-i/,
+  /(^|[\s;&|(])(rm|rmdir|mv|cp|touch|mkdir|truncate|dd|ln|chmod|chown|unlink|install)\s/,
+  /\bgit\s+(apply|checkout|switch|restore|reset|clean|commit|merge|rebase|stash|mv|rm|am|cherry-pick|revert|pull)\b/,
+  /\b(npm|pnpm|yarn|bun)\s+(i|install|add|remove|rm|uninstall|update|up|ci|link)\b/,
+  /\b(Set-Content|Add-Content|Out-File|New-Item|Remove-Item|Move-Item|Copy-Item|Rename-Item|Clear-Content)\b/i,
+  /(^|[\s;&|(])(del|erase|copy|move|ren|rename|md)\s/i,
+];
+
+export const shellWrites = (cmd: string) => SHELL_WRITES.some((re) => re.test(cmd));
+
+function toRel(root: string, p: string): string {
+  const abs = isAbsolute(p) ? p : resolve(root, p);
+  return relative(root, abs).replace(/\\/g, '/');
+}
+
+// relative() returns an absolute path when the file is on another drive
+const outside = (rel: string) => rel === '..' || rel.startsWith('../') || isAbsolute(rel) || /^[a-z]:/i.test(rel);
+const inBoard = (rel: string) => rel === BOARD_DIR || rel.startsWith(`${BOARD_DIR}/`);
+
+const DENY_TAIL = 'Get a step approved on the board, then update {id,s:"run"} first.';
+
+export function guardDecision(state: State, root: string, input: Pick<HookInput, 'tool_name' | 'tool_input'>): string | undefined {
   const mode = state.cfg.guard;
-  if (mode === 'off' || !file) return undefined;
-  const abs = isAbsolute(file) ? file : resolve(root, file);
-  const rel = relative(root, abs).replace(/\\/g, '/');
-  if (rel === BOARD_DIR || rel.startsWith(`${BOARD_DIR}/`)) return undefined;
-  if (rel.startsWith('../')) return undefined; // outside the project: not ours to police
-  if (!state.phases.length) return undefined; // no plan yet: nothing to gate
-  const running = leaves(state).filter((x) => x.s === 'run');
-  if (running.length) return undefined;
-  if (mode === 'sensitive' && !state.cfg.protect.some((g) => globToRegExp(g).test(rel))) return undefined;
+  if (mode === 'off' || !state.phases.length) return undefined; // no plan yet: nothing to gate
+  if (leaves(state).some((x) => x.s === 'run')) return undefined;
+  const protectedPath = (rel: string) => state.cfg.protect.some((g) => globToRegExp(g).test(rel));
+
+  if (input.tool_name === 'Bash') {
+    const cmd = input.tool_input?.command ?? '';
+    if (!cmd || !shellWrites(cmd)) return undefined;
+    if (mode === 'sensitive') {
+      const tokens = cmd.split(/[\s;&|<>()]+/).map((t) => t.replace(/^['"]|['"]$/g, '')).filter(Boolean);
+      const hit = tokens.map((t) => toRel(root, t)).find((rel) => !outside(rel) && !inBoard(rel) && protectedPath(rel));
+      return hit ? `Claude Board: this command touches protected ${hit}. ${DENY_TAIL}` : undefined;
+    }
+    return `Claude Board: no step is running and this command changes files. ${DENY_TAIL}`;
+  }
+
+  const file = input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? input.tool_input?.path;
+  if (!file) return undefined;
+  const rel = toRel(root, file);
+  if (inBoard(rel) || outside(rel)) return undefined; // board files, or outside the project
+  if (mode === 'sensitive' && !protectedPath(rel)) return undefined;
   const why = mode === 'sensitive' ? `${rel} is protected` : 'no step is running';
-  return `Claude Board: ${why}. Get a step approved on the board, then update {id,s:"run"} before editing.`;
+  return `Claude Board: ${why}. ${DENY_TAIL}`;
 }
 
 export async function runHook(name: string) {
@@ -95,8 +133,7 @@ export async function runHook(name: string) {
       return;
     }
     case 'guard': {
-      const file = input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? input.tool_input?.path;
-      const reason = guardDecision(store.read(), root, file);
+      const reason = guardDecision(store.read(), root, input);
       if (reason) emit('PreToolUse', { permissionDecision: 'deny', permissionDecisionReason: reason });
       return;
     }
