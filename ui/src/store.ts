@@ -25,6 +25,8 @@ interface BoardStore {
   batch: string[];
   /** Collapsed phases, keyed by `project|phaseId` so boards don't share them. */
   collapsed: Record<string, boolean>;
+  /** Open "new task / new phase" dialog: a phase id for a task, or 'phase' for a new phase. */
+  adding?: { phase: string } | 'phase';
   setState: (s: State) => void;
   setUsage: (u: Usage) => void;
   setConnected: (v: boolean) => void;
@@ -42,9 +44,12 @@ interface BoardStore {
   clearBatch: () => void;
   isCollapsed: (phaseId: string) => boolean;
   toggleCollapsed: (phaseId: string) => void;
+  openAdd: (target: { phase: string } | 'phase') => void;
+  closeAdd: () => void;
 }
 
-const PICKABLE = ['todo', 'ok', 'block'];
+// anything not running can be picked: open ones to start, any of them to archive
+const PICKABLE = ['todo', 'ok', 'block', 'done', 'fail', 'skip'];
 
 // ?lang=en&theme=light in the URL wins over the remembered choice
 const saved = <T extends string>(key: string, fallback: T): T => {
@@ -117,7 +122,9 @@ export const useBoard = create<BoardStore>((set, get) => ({
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
-      if (sentLabel) get().toast('sent', `${translate(get().lang, 'sent')} · ${sentLabel}`);
+      // archiving is housekeeping on the board, so it doesn't claim a message went to Claude
+      const local = a.type === 'archive' || a.type === 'unarchive';
+      if (sentLabel) get().toast(local ? 'done' : 'sent', local ? sentLabel : `${translate(get().lang, 'sent')} · ${sentLabel}`);
       return true;
     } catch (e: any) {
       get().toast('error', e?.message ?? String(e));
@@ -135,6 +142,8 @@ export const useBoard = create<BoardStore>((set, get) => ({
     save('cb.collapsed', JSON.stringify(collapsed));
     set({ collapsed });
   },
+  openAdd: (adding) => set({ adding }),
+  closeAdd: () => set({ adding: undefined }),
 }));
 
 export function useT() {

@@ -24,6 +24,9 @@ const paths = {
   grip: 'M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01',
   help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.3-2.7 4.1M12 17.3v.2',
   info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v6M12 7.5v.2',
+  archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  terminal: 'M4 17l6-5-6-5M12 19h8',
 } as const;
 
 export type IconName = keyof typeof paths;

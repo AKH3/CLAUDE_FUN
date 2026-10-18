@@ -100,7 +100,7 @@ export function Canvas() {
           className="!hidden md:!block"
           nodeBorderRadius={6}
           nodeColor={(n) => {
-            if (n.type === 'lane') return 'transparent';
+            if (n.type === 'lane' || n.type === 'add' || n.type === 'addPhase') return 'transparent';
             if (n.type === 'phase') return 'var(--panel2)';
             const d = (n as any).data;
             return STATUS_COLOR[d.locked ? 'locked' : d.step.s as keyof typeof STATUS_COLOR];

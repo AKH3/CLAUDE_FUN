@@ -90,6 +90,10 @@ export function fmtDirective(d: Directive): string {
       return `guard ${d.x}`;
     case 'ask':
       return `ask ${t}`;
+    case 'arch':
+      return `archived ${d.x} (drop)`;
+    case 'unarch':
+      return `restored ${d.x}`;
   }
 }
 
@@ -97,13 +101,14 @@ export const fmtDirectives = (ds: Directive[]) => ds.map(fmtDirective).join('; '
 
 // ---------- ids ----------
 
+// ids count archived items too, so a restored phase or step never collides with a new one
 function nextPhaseId(s: State) {
-  return 'P' + (Math.max(0, ...s.phases.map((p) => num(p.id))) + 1);
+  return 'P' + (Math.max(0, ...[...s.phases, ...s.archive.phases].map((p) => num(p.id))) + 1);
 }
 
 function nextStepId(s: State, phaseId: string, parentId: string | null) {
   const prefix = parentId ? `${parentId}.` : `S${phaseNum(s, phaseId)}.`;
-  const used = s.steps
+  const used = [...s.steps, ...s.archive.steps]
     .filter((x) => x.id.startsWith(prefix) && !x.id.slice(prefix.length).includes('.'))
     .map((x) => Number(x.id.slice(prefix.length)) || 0);
   return prefix + (Math.max(0, ...used) + 1);
@@ -336,6 +341,69 @@ function action(s: State, a: Action): string {
       directive(s, 'ask', st.id);
       return `ask ${st.id}`;
     }
+    case 'archive': {
+      const at = now();
+      const phaseIds = new Set(a.ids.filter((id) => findPhase(s, id)));
+      const stepIds = new Set<string>();
+      for (const id of a.ids) {
+        const group = phaseIds.has(id) ? s.steps.filter((x) => x.p === id) : [need(s, id), ...descendants(s, id)];
+        for (const x of group) stepIds.add(x.id);
+      }
+      const steps = s.steps.filter((x) => stepIds.has(x.id));
+      if (steps.some((x) => x.s === 'run')) throw new Error('a running step cannot be archived');
+      // unfinished work Claude might still plan to do: tell it to drop those
+      const open = steps.filter((x) => !hasChildren(s, x.id) && ['todo', 'ok', 'block'].includes(x.s)).map((x) => x.id);
+      s.steps = s.steps.filter((x) => !stepIds.has(x.id));
+      s.archive.steps.push(...steps.map((x) => ({ ...x, q: undefined, arc: at })));
+      s.archive.phases.push(...s.phases.filter((p) => phaseIds.has(p.id)).map((p) => ({ ...p, arc: at })));
+      s.phases = s.phases.filter((p) => !phaseIds.has(p.id));
+      if (open.length) directive(s, 'arch', undefined, open.join(','));
+      return `archived ${a.ids.join(',')}`;
+    }
+    case 'unarchive': {
+      const arch = s.archive;
+      const restorePhase = (id: string) => {
+        const i = arch.phases.findIndex((p) => p.id === id);
+        if (i >= 0) s.phases.push({ ...arch.phases.splice(i, 1)[0], arc: undefined });
+      };
+      const restoreSteps = (pick: (x: Step) => boolean) => {
+        const moved = arch.steps.filter(pick);
+        arch.steps = arch.steps.filter((x) => !pick(x));
+        s.steps.push(...moved.map((x) => ({ ...x, arc: undefined })));
+        return moved;
+      };
+      const back: Step[] = [];
+      for (const id of a.ids) {
+        if (arch.phases.some((p) => p.id === id)) {
+          restorePhase(id);
+          back.push(...restoreSteps((x) => x.p === id));
+          continue;
+        }
+        const archived = (sid: string | null) => (sid ? arch.steps.find((x) => x.id === sid) : undefined);
+        let top = archived(id);
+        if (!top) continue; // already restored with its phase or parent
+        // bring back the top-most archived ancestor so the subtree stays whole
+        for (let up = archived(top.parent); up; up = archived(up.parent)) top = up;
+        if (!findPhase(s, top.p)) restorePhase(top.p);
+        if (!findPhase(s, top.p)) throw new Error(`${top.p} not found`);
+        if (top.parent && !findStep(s, top.parent)) top.parent = null;
+        const ids = new Set([top.id]);
+        for (let grew = true; grew; ) {
+          grew = false;
+          for (const x of arch.steps) {
+            if (x.parent && ids.has(x.parent) && !ids.has(x.id)) {
+              ids.add(x.id);
+              grew = true;
+            }
+          }
+        }
+        back.push(...restoreSteps((x) => ids.has(x.id)));
+      }
+      if (!back.length && !a.ids.some((id) => findPhase(s, id))) throw new Error('nothing to restore');
+      const open = back.filter((x) => !hasChildren(s, x.id) && ['todo', 'ok', 'block'].includes(x.s)).map((x) => x.id);
+      if (open.length) directive(s, 'unarch', undefined, open.join(','));
+      return `restored ${a.ids.join(',')}`;
+    }
     case 'reject': {
       const st = need(s, a.id);
       for (const x of [st, ...descendants(s, st.id)]) if (x.s !== 'done') x.s = 'skip';
@@ -364,8 +432,9 @@ function action(s: State, a: Action): string {
       const parent = a.parent ? need(s, a.parent) : undefined;
       const phaseId = parent?.p ?? a.phase ?? phasesSorted(s).at(-1)?.id;
       if (!phaseId || !findPhase(s, phaseId)) throw new Error('phase not found');
-      const [id] = addSteps(s, phaseId, parent?.id ?? null, [a.t], 'ok', 'user');
+      const [id] = addSteps(s, phaseId, parent?.id ?? null, [{ t: a.t, d: a.d?.trim() || undefined }], a.ok === false ? 'todo' : 'ok', 'user');
       directive(s, 'add', id, a.t);
+      if (a.d?.trim()) directive(s, 'note', id, a.d.trim());
       return `added ${id}`;
     }
     case 'addPhase': {

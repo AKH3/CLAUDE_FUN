@@ -69,6 +69,9 @@ claude-fun demo --simulate
 | **اسأل كلاود ❔** | زر `?` على كل بطاقة: يشرح كلاود الخطوة وفائدتها المتوقعة في 25 كلمة أو أقل. لا يُسأل إلا عند الضغط، والإجابة تُحفظ فلا تتكرر تكلفتها. |
 | **الجهد المتوقع** | يقدّر كلاود جهد كل خطوة (خفيف / متوسط / كبير) ويظهر كأعمدة صغيرة بجانب رقمها، برقم واحد فقط في الخطة. |
 | **طي المراحل** | اضغط على بطاقة المرحلة لتطوي خطواتها أو تعرضها. زر ⓘ يفتح تفاصيل المرحلة. |
+| **مهمة جديدة من اللوحة** | مربع «+ مهمة جديدة» أسفل كل مرحلة يفتح نافذة فيها العنوان والتفاصيل، وتختار هل تبدأ مباشرة أو تنتظر اعتمادك. ومربع «+ مرحلة جديدة» بعد آخر مرحلة. |
+| **الأرشيف** | أرشف مرحلة مكتملة بزر 🗃 على بطاقتها، أو حدّد عدة مهام بـ `#` واضغط «أرشفة». تختفي من اللوحة ومن ملخص كلاود فيقلّ ما يقرأه، وتبقى محفوظة في `.claude-board/state.json` وتسترجعها من زر الأرشيف بالأعلى. |
+| **أوامر سريعة** | زر `>_` بالأعلى: عبارات جاهزة لكلاود وأوامر للطرفية، تنسخها بضغطة. |
 | **كبسولة النتائج** | لكل خطوة منجزة: عدد الملفات، والأسطر المضافة والمحذوفة، وحالة الاختبار، والمدة، والتوكنز. يحسبها المحرك من git بنفسه، فلا تكلّف كلاود شيئاً. |
 | **عرض التعديلات** | زر واحد يفتح diff الخطوة بالضبط، حتى بدون commits، لأن المحرك يلتقط شجرة العمل عند بداية الخطوة وعند نهايتها. |
 | **عدّاد كفاءة التوكنز** | أرقام حقيقية من سجلات Claude Code، موزعة على المراحل والخطوات ومقارنة بالميزانية. |
@@ -198,6 +201,9 @@ Run `init` inside a project folder: it refuses your home folder and drive roots,
 - **Ask Claude (`?`):** a 25-word-max explanation of what a step does and its expected benefit. Asked only when you press it, and cached on the step.
 - **Expected effort:** Claude rates each step small/medium/large (one digit in the plan), shown as bars next to its id.
 - **Collapsible phases:** click a phase card to fold or unfold its steps; ⓘ opens the phase details.
+- **Add from the board:** a *+ New task* box closes every phase column and opens a dialog for a title and details; you choose whether Claude may start it right away. *+ New phase* sits after the last column.
+- **Archive:** archive a finished phase from its card, or pick tasks with `#` and press *Archive*. They leave the board and Claude's summary, stay in `.claude-board/state.json`, and come back from the archive panel.
+- **Quick commands:** the `>_` button lists copy-ready phrases for Claude and terminal commands.
 - **Result capsules:** files changed, +/− lines, test status, duration and tokens, all computed by the engine from git snapshots taken in a throwaway index. No commits are needed and Claude spends zero tokens on them.
 - **One-click diff** for exactly what a step changed.
 - **Token efficiency meter:** real usage parsed from Claude Code's session logs, attributed to phases and steps, against a budget.

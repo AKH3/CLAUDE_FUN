@@ -1,5 +1,6 @@
 import type { GuardMode } from '../../../src/core/schema';
 import { hasChildren } from '../../../src/core/tree';
+import type { Panel } from '../App';
 import { useBoard, useT } from '../store';
 import { Icon } from './Icon';
 import { TokenMeter } from './TokenMeter';
@@ -33,7 +34,7 @@ function Ring({ value, total }: { value: number; total: number }) {
 
 const GUARDS: GuardMode[] = ['strict', 'sensitive', 'off'];
 
-export function TopBar({ onActivity }: { onActivity: () => void }) {
+export function TopBar({ panel, onPanel }: { panel?: Panel; onPanel: (p: Panel) => void }) {
   const t = useT();
   const state = useBoard((s) => s.state)!;
   const connected = useBoard((s) => s.connected);
@@ -46,6 +47,13 @@ export function TopBar({ onActivity }: { onActivity: () => void }) {
   const leaves = state.steps.filter((x) => !hasChildren(state, x.id) && x.s !== 'skip');
   const done = leaves.filter((x) => x.s === 'done').length;
   const pending = state.inbox.filter((d) => !d.ack).length;
+  const archived = new Set(state.archive.phases.map((p) => p.id));
+  const archiveCount = archived.size + state.archive.steps.filter((x) => !archived.has(x.p)).length;
+  const panels = [
+    ['commands', 'terminal', t('cmd.title'), 0],
+    ['archive', 'archive', t('archive'), archiveCount],
+    ['activity', 'list', t('activity'), 0],
+  ] as const;
 
   return (
     <header className="relative z-30 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-panel/90 px-4 py-2.5 backdrop-blur">
@@ -114,9 +122,22 @@ export function TopBar({ onActivity }: { onActivity: () => void }) {
           ))}
         </div>
 
-        <button type="button" onClick={onActivity} className="grid size-9 place-items-center rounded-lg border border-line bg-panel text-muted hover:text-text" title={t('activity')} aria-label={t('activity')}>
-          <Icon name="list" size={16} />
-        </button>
+        {panels.map(([key, icon, label, count]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onPanel(key)}
+            aria-pressed={panel === key}
+            className={`relative grid size-9 place-items-center rounded-lg border bg-panel hover:text-text ${panel === key ? 'border-ok text-ok' : 'border-line text-muted'}`}
+            title={label}
+            aria-label={label}
+          >
+            <Icon name={icon} size={16} />
+            {count > 0 && (
+              <span className="absolute -end-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-ok px-1 font-mono text-[10px] font-bold text-white">{count}</span>
+            )}
+          </button>
+        ))}
         <button
           type="button"
           onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}

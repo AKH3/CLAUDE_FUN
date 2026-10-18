@@ -10,6 +10,7 @@ export const PHASE_H = 104;
 export const STEP_W = 252;
 export const STEP_H = 96;
 export const GAP = 14;
+export const ADD_H = 40;
 export const INDENT = 22;
 export const TOP = PHASE_H + 30;
 
@@ -45,7 +46,9 @@ export interface LaneData extends Record<string, unknown> {
 export type StepNodeT = Node<StepData, 'step'>;
 export type PhaseNodeT = Node<PhaseData, 'phase'>;
 export type LaneNodeT = Node<LaneData, 'lane'>;
-export type BoardNode = StepNodeT | PhaseNodeT | LaneNodeT;
+export type AddNodeT = Node<{ phase: string }, 'add'>;
+export type AddPhaseNodeT = Node<Record<string, never>, 'addPhase'>;
+export type BoardNode = StepNodeT | PhaseNodeT | LaneNodeT | AddNodeT | AddPhaseNodeT;
 
 const leafOf = (s: State, st: Step) => (hasChildren(s, st.id) ? descendants(s, st.id).filter((x) => !hasChildren(s, x.id)) : [st]);
 
@@ -125,14 +128,28 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean, isColla
         walk(children, depth + 1);
       }
     };
-    if (!collapsed) walk(childrenOf(s, null, ph.id), 0);
+    if (!collapsed) {
+      walk(childrenOf(s, null, ph.id), 0);
+      // "+ new task" box closing each column
+      nodes.push({
+        id: `add-${ph.id}`,
+        type: 'add',
+        position: { x: x + (PHASE_W - STEP_W) / 2, y },
+        width: STEP_W,
+        height: ADD_H,
+        draggable: false,
+        selectable: false,
+        data: { phase: ph.id },
+      });
+      y += ADD_H + GAP;
+    }
 
     nodes.unshift({
       id: `lane-${ph.id}`,
       type: 'lane',
       position: { x: x - 12, y: -12 },
       width: PHASE_W + 24,
-      height: collapsed ? PHASE_H + 24 : Math.max(y, TOP + STEP_H) - GAP + 26,
+      height: collapsed ? PHASE_H + 24 : y - GAP + 26,
       draggable: false,
       selectable: false,
       focusable: false,
@@ -155,6 +172,20 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean, isColla
       });
     }
   });
+
+  // "+ new phase" column after the last one (mirrored in RTL)
+  if (n > 0) {
+    nodes.push({
+      id: 'add-phase',
+      type: 'addPhase',
+      position: { x: (rtl ? -1 : n) * COL_W, y: 0 },
+      width: PHASE_W,
+      height: PHASE_H,
+      draggable: false,
+      selectable: false,
+      data: {},
+    });
+  }
 
   // dep links only between cards that are on screen (collapsed phases hide theirs)
   const shown = new Set(nodes.map((n) => n.id));

@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import type { Step } from '../../../src/core/schema';
 import { duration, kfmt, PHASE_PALETTE, STATUS_COLOR, STATUS_ICON } from '../format';
-import type { LaneNodeT, PhaseNodeT, StepNodeT } from '../layout';
+import type { AddNodeT, AddPhaseNodeT, LaneNodeT, PhaseNodeT, StepNodeT } from '../layout';
 import { useBoard, useT } from '../store';
 import { Effort } from './Effort';
 import { Icon } from './Icon';
@@ -97,7 +97,8 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
   const color = STATUS_COLOR[status];
   const lit = useFlash(st.s === 'done');
   const pick = useBoard((s) => s.batch.indexOf(st.id)) + 1;
-  const pickable = !container && !locked && ['todo', 'ok', 'block'].includes(st.s);
+  const pickable = !container && st.s !== 'run';
+  const pickBtn = pickable ? <PickBtn id={st.id} n={pick} /> : null;
   const { lead, trail } = sides(rtl);
   const cls = [
     'relative flex h-full flex-col rounded-xl border border-s-4 bg-panel px-3 py-2 shadow-[var(--shadow)] transition-[opacity,transform]',
@@ -155,7 +156,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
           <>
             <span className="text-todo">{t('status.todo')}</span>
             <span className="ms-auto flex gap-1">
-              <PickBtn id={st.id} n={pick} />
+              {pickBtn}
               <MiniBtn icon="scissors" label={t('act.split')} color="var(--ok)" onClick={() => act({ type: 'split', id: st.id }, `split ${st.id}`)} />
               <MiniBtn icon="check" label={t('act.approve')} color="var(--done)" onClick={() => act({ type: 'approve', id: st.id })} />
             </span>
@@ -186,20 +187,20 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
               </span>
             )}
             <span className="ms-auto">{duration(st.at.run, st.at.end)}</span>
+            {pickBtn}
           </span>
         ) : locked ? (
-          <span className="flex items-center gap-1 text-muted">
-            <Icon name="lock" size={11} />
-            <span dir="ltr">{st.deps.join(', ')}</span>
-          </span>
+          <>
+            <span className="flex items-center gap-1 text-muted">
+              <Icon name="lock" size={11} />
+              <span dir="ltr">{st.deps.join(', ')}</span>
+            </span>
+            <span className="ms-auto">{pickBtn}</span>
+          </>
         ) : (
           <>
             <span style={{ color }}>{t(`status.${st.s}` as const)}</span>
-            {pickable && (
-              <span className="ms-auto">
-                <PickBtn id={st.id} n={pick} />
-              </span>
-            )}
+            <span className="ms-auto">{pickBtn}</span>
           </>
         )}
       </div>
@@ -284,7 +285,8 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>
             {total} {t('phase.steps')}
           </span>
         )}
-        <span className={todo > 0 && !complete ? '' : 'ms-auto'}>
+        <span className={`flex gap-1 ${todo > 0 && !complete ? '' : 'ms-auto'}`}>
+          {complete && <MiniBtn icon="archive" label={t('archive.phase')} color="var(--gold)" onClick={() => act({ type: 'archive', ids: [phase.id] }, `${t('archive')} · ${phase.id}`)} />}
           <MiniBtn icon="info" label={t('phase.details')} color="var(--ok)" onClick={() => select(phase.id)} />
         </span>
       </div>
@@ -308,4 +310,31 @@ export const LaneNode = memo(function LaneNode({ data }: NodeProps<LaneNodeT>) {
   );
 });
 
-export const nodeTypes = { step: StepNode, phase: PhaseNode, lane: LaneNode };
+const addCls =
+  'nodrag flex h-full w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-[13px] text-muted transition hover:border-ok hover:bg-ok/5 hover:text-ok';
+
+/** "+ new task" box at the bottom of a phase column. */
+export const AddNode = memo(function AddNode({ data }: NodeProps<AddNodeT>) {
+  const t = useT();
+  const openAdd = useBoard((s) => s.openAdd);
+  return (
+    <button type="button" className={addCls} onClick={() => openAdd({ phase: data.phase })}>
+      <Icon name="plus" size={15} />
+      {t('add.task')}
+    </button>
+  );
+});
+
+/** "+ new phase" column after the last phase. */
+export const AddPhaseNode = memo(function AddPhaseNode(_: NodeProps<AddPhaseNodeT>) {
+  const t = useT();
+  const openAdd = useBoard((s) => s.openAdd);
+  return (
+    <button type="button" className={`${addCls} rounded-2xl text-[14px]`} onClick={() => openAdd('phase')}>
+      <Icon name="plus" size={17} />
+      {t('act.addPhase')}
+    </button>
+  );
+});
+
+export const nodeTypes = { step: StepNode, phase: PhaseNode, lane: LaneNode, add: AddNode, addPhase: AddPhaseNode };
