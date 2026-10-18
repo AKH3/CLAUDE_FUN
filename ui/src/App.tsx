@@ -1,7 +1,10 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useEffect, useState } from 'react';
+import { AddDialog } from './components/AddDialog';
+import { ArchivePanel } from './components/ArchivePanel';
 import { BatchBar } from './components/BatchBar';
 import { Canvas } from './components/Canvas';
+import { CommandsPanel } from './components/CommandsPanel';
 import { DiffModal } from './components/DiffModal';
 import { Icon } from './components/Icon';
 import { Inspector } from './components/Inspector';
@@ -10,12 +13,15 @@ import { TopBar } from './components/TopBar';
 import { connect } from './sse';
 import { useBoard } from './store';
 
+export type Panel = 'activity' | 'archive' | 'commands';
+
 export function App() {
   const state = useBoard((s) => s.state);
   const lang = useBoard((s) => s.lang);
   const theme = useBoard((s) => s.theme);
   const problem = useBoard((s) => s.problem);
-  const [activity, setActivity] = useState(false);
+  const [panel, setPanel] = useState<Panel>();
+  const close = () => setPanel(undefined);
 
   useEffect(() => connect(), []);
   useEffect(() => {
@@ -42,7 +48,7 @@ export function App() {
   return (
     <ReactFlowProvider>
       <div className="flex h-full flex-col">
-        <TopBar onActivity={() => setActivity((v) => !v)} />
+        <TopBar panel={panel} onPanel={(p) => setPanel((cur) => (cur === p ? undefined : p))} />
         {problem && (
           <div className="flex items-center gap-2 bg-fail/15 px-4 py-2 text-[13px] text-fail" dir="ltr">
             <Icon name="alert" size={14} /> {problem}
@@ -50,10 +56,13 @@ export function App() {
         )}
         <main className="relative min-h-0 flex-1 overflow-hidden">
           {state.phases.length ? <Canvas /> : <EmptyState />}
-          {activity && <ActivityPanel onClose={() => setActivity(false)} />}
+          {panel === 'activity' && <ActivityPanel onClose={close} />}
+          {panel === 'archive' && <ArchivePanel onClose={close} />}
+          {panel === 'commands' && <CommandsPanel onClose={close} />}
           <Inspector />
         </main>
         <DiffModal />
+        <AddDialog />
         <BatchBar />
         <Toasts />
       </div>

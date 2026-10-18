@@ -201,6 +201,11 @@ function StepPanel({ st }: { st: Step }) {
               {t('act.diff')}
             </Btn>
           )}
+          {st.s !== 'run' && (
+            <Btn icon="archive" onClick={async () => (await act({ type: 'archive', ids: [st.id] }, `${t('archive')} · ${st.id}`)) && select(undefined)}>
+              {t('archive.do')}
+            </Btn>
+          )}
         </div>
         {locked && (
           <p className="mt-2 flex items-center gap-1 text-[12px] text-muted">
@@ -365,6 +370,7 @@ function PhasePanel({ ph }: { ph: Phase }) {
   const state = useBoard((s) => s.state)!;
   const usage = useBoard((s) => s.usage);
   const act = useBoard((s) => s.act);
+  const select = useBoard((s) => s.select);
   const top = childrenOf(state, null, ph.id);
   const leaves = state.steps.filter((x) => x.p === ph.id && !hasChildren(state, x.id) && x.s !== 'skip');
   const done = leaves.filter((x) => x.s === 'done').length;
@@ -396,6 +402,11 @@ function PhasePanel({ ph }: { ph: Phase }) {
       <Section>
         <Composer multiline={false} icon="plus" placeholder={t('act.addStep')} onSend={(x) => act({ type: 'addStep', phase: ph.id, t: x }, `+ ${ph.id}`)} />
       </Section>
+      <Section>
+        <Btn icon="archive" disabled={leaves.some((x) => x.s === 'run')} onClick={async () => (await act({ type: 'archive', ids: [ph.id] }, `${t('archive')} · ${ph.id}`)) && select(undefined)}>
+          {t('archive.phase')}
+        </Btn>
+      </Section>
     </>
   );
 }
@@ -408,7 +419,7 @@ export function Inspector() {
 
   useEffect(() => {
     // Esc closes the diff first, then the inspector
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !useBoard.getState().diff && select(undefined);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !useBoard.getState().diff && !useBoard.getState().adding && select(undefined);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [select]);

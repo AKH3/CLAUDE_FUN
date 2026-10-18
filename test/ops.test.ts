@@ -176,3 +176,64 @@ describe('batch start', () => {
     expect(() => applyAction(s, { type: 'approveMany', ids: ['S2.3'] })).toThrow('nothing to start');
   });
 });
+
+describe('add with details', () => {
+  it('stores details, tells Claude, and can wait for approval', () => {
+    const s = planned();
+    applyAction(s, { type: 'addStep', phase: 'P2', t: 'Rate limit', d: 'per IP, 100/min', ok: false });
+    const st = findStep(s, 'S2.4')!;
+    expect([st.s, st.d, st.by]).toEqual(['todo', 'per IP, 100/min', 'user']);
+    expect(fmtDirectives(takeUnread(s))).toBe('+S2.4 "Rate limit" (user); S2.4 note:"per IP, 100/min"');
+    applyAction(s, { type: 'addStep', phase: 'P2', t: 'Quick one' });
+    expect(findStep(s, 'S2.5')!.s).toBe('ok');
+  });
+});
+
+describe('archive', () => {
+  it('moves finished phases off the board and out of the summary', () => {
+    const s = planned();
+    applyAction(s, { type: 'approvePhase', id: 'P1' });
+    for (const id of ['S1.1', 'S1.2']) applyDeltas(s, [{ id, s: 'run' }, { id, s: 'done' }]);
+    takeUnread(s);
+    applyAction(s, { type: 'archive', ids: ['P1'] });
+    expect(s.phases.map((p) => p.id)).toEqual(['P2']);
+    expect(s.archive.phases.map((p) => p.id)).toEqual(['P1']);
+    expect(s.archive.steps.map((x) => x.id)).toEqual(['S1.1', 'S1.2']);
+    expect(s.archive.steps[0].arc).toBeTruthy();
+    expect(takeUnread(s)).toEqual([]); // nothing unfinished, so Claude hears nothing
+    expect(summary(s)).not.toContain('S1.');
+    // new ids never reuse archived ones
+    applyAction(s, { type: 'addPhase', t: 'Later' });
+    expect(s.phases.at(-1)!.id).toBe('P3');
+  });
+
+  it('archives a subtree, tells Claude to drop unfinished work, and restores it whole', () => {
+    const s = planned();
+    applyPlan(s, { parent: 'S2.1', steps: ['routes', 'static'] });
+    applyAction(s, { type: 'archive', ids: ['S2.1.2', 'S2.1'] });
+    expect(s.steps.map((x) => x.id)).toEqual(['S1.1', 'S1.2', 'S2.2', 'S2.3']);
+    expect(fmtDirectives(takeUnread(s))).toBe('archived S2.1.1,S2.1.2 (drop)');
+
+    applyAction(s, { type: 'addStep', phase: 'P2', t: 'next' });
+    expect(findStep(s, 'S2.4')).toBeTruthy(); // S2.1 stays reserved
+
+    applyAction(s, { type: 'unarchive', ids: ['S2.1.2'] }); // a child brings its parent back
+    expect(['S2.1', 'S2.1.1', 'S2.1.2'].every((id) => findStep(s, id) && !findStep(s, id)!.arc)).toBe(true);
+    expect(s.archive.steps).toEqual([]);
+    expect(fmtDirectives(takeUnread(s))).toContain('restored S2.1.1,S2.1.2');
+  });
+
+  it('restores a step together with its archived phase, and refuses running steps', () => {
+    const s = planned();
+    applyAction(s, { type: 'archive', ids: ['P1'] });
+    applyAction(s, { type: 'unarchive', ids: ['S1.2'] });
+    expect(s.phases.map((p) => p.id).sort()).toEqual(['P1', 'P2']);
+    expect(findStep(s, 'S1.2')).toBeTruthy();
+    expect(s.archive.steps.map((x) => x.id)).toEqual(['S1.1']);
+
+    applyAction(s, { type: 'approve', id: 'S2.2' });
+    applyDeltas(s, [{ id: 'S2.2', s: 'run' }]);
+    expect(() => applyAction(s, { type: 'archive', ids: ['P2'] })).toThrow('running');
+    expect(() => applyAction(s, { type: 'unarchive', ids: ['S9.9'] })).toThrow('nothing to restore');
+  });
+});

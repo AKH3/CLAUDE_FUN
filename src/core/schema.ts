@@ -6,7 +6,7 @@ export const STEP_STATUS = ['todo', 'ok', 'run', 'done', 'fail', 'block', 'skip'
 export const CLAUDE_STATUS = ['run', 'done', 'fail', 'block'] as const;
 export const GUARD_MODES = ['strict', 'sensitive', 'off'] as const;
 export const TEST_STATUS = ['pass', 'fail', 'none'] as const;
-export const DIRECTIVE_KINDS = ['ok', 'no', 'split', 'note', 'prio', 'edit', 'add', 'retry', 'guard', 'ask'] as const;
+export const DIRECTIVE_KINDS = ['ok', 'no', 'split', 'note', 'prio', 'edit', 'add', 'retry', 'guard', 'ask', 'arch', 'unarch'] as const;
 
 export const DEFAULT_PROTECT = [
   '.env*',
@@ -41,6 +41,7 @@ export const StepSchema = z.object({
   a: z.string().optional(), // Claude's answer to the user's "?" question
   ask: z.boolean().optional(), // a "?" question is waiting for Claude
   q: z.number().optional(), // queue position from a batch start; lower runs first
+  arc: z.string().optional(), // when it was archived (only on archived copies)
   by: z.enum(['claude', 'user']).optional(),
   r: ResultSchema.optional(),
   base: z.string().optional(), // git tree when the step started
@@ -56,6 +57,7 @@ export const PhaseSchema = z.object({
   o: z.number().default(0),
   d: z.string().optional(),
   budget: z.number().optional(),
+  arc: z.string().optional(), // when it was archived
 });
 
 export const DirectiveSchema = z.object({
@@ -86,6 +88,10 @@ export const StateSchema = z.object({
   cfg: CfgSchema.prefault({}),
   phases: z.array(PhaseSchema).default([]),
   steps: z.array(StepSchema).default([]),
+  // Archived phases and steps leave the live board (and Claude's summary) but stay in this file.
+  archive: z
+    .object({ phases: z.array(PhaseSchema).default([]), steps: z.array(StepSchema).default([]) })
+    .prefault({}),
   inbox: z.array(DirectiveSchema).default([]),
   log: z.array(LogSchema).default([]),
 });
@@ -145,9 +151,13 @@ export const ActionSchema = z.discriminatedUnion('type', [
     phase: z.string().optional(),
     parent: z.string().optional(),
     t: z.string().min(1).max(200),
+    d: z.string().max(1000).optional(),
+    ok: z.boolean().optional(), // approve right away (default true for quick adds)
   }),
   z.object({ type: z.literal('addPhase'), t: z.string().min(1).max(120) }),
   z.object({ type: z.literal('note'), id: z.string().optional(), x: z.string().min(1).max(500) }),
+  z.object({ type: z.literal('archive'), ids: z.array(z.string()).min(1).max(200) }),
+  z.object({ type: z.literal('unarchive'), ids: z.array(z.string()).min(1).max(200) }),
   z.object({ type: z.literal('reorder'), id: z.string(), to: z.number().int().min(0) }),
   z.object({ type: z.literal('edit'), id: z.string(), t: z.string().min(1).max(200) }),
   z.object({ type: z.literal('setGuard'), mode: z.enum(GUARD_MODES) }),
