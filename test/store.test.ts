@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyAction, applyPlan } from '../src/core/ops.js';
 import { Store } from '../src/core/store.js';
-import { tempDir } from './helpers.js';
+import { tempDir, TSX } from './helpers.js';
 
 let cleanup: (() => void) | undefined;
 afterEach(() => cleanup?.());
@@ -40,7 +40,7 @@ describe('Store', () => {
     );
     const run = (tag: string) =>
       new Promise<number>((res) => {
-        const p = spawn(process.execPath, ['--import', 'tsx', script, t.dir, tag], { stdio: 'inherit' });
+        const p = spawn(process.execPath, ['--import', TSX, script, t.dir, tag], { stdio: 'inherit' });
         p.on('exit', (c) => res(c ?? 1));
       });
     const codes = await Promise.all([run('a'), run('b'), run('c')]);

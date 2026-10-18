@@ -18,7 +18,7 @@ const INBOX_CAP = 100;
 export const now = () => new Date().toISOString();
 
 export function emptyState(name: string, goal?: string): State {
-  return StateSchema.parse({ project: { name, goal } });
+  return StateSchema.parse({ project: { name, goal, since: now() } });
 }
 
 // ---------- lookups & ordering ----------

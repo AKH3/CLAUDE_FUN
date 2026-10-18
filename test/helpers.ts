@@ -15,3 +15,6 @@ export function gitInit(dir: string) {
   run('config', 'user.name', 'test');
   run('config', 'core.autocrlf', 'false');
 }
+
+/** Absolute tsx loader URL, so child processes can run .ts from any cwd. */
+export const TSX = new URL('../node_modules/tsx/dist/loader.mjs', import.meta.url).href;

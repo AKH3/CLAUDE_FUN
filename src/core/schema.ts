@@ -76,7 +76,9 @@ export const StateSchema = z.object({
   v: z.literal(1).default(1),
   rev: z.number().default(0),
   seq: z.number().default(0),
-  project: z.object({ name: z.string(), goal: z.string().optional() }).prefault({ name: 'Project' }),
+  project: z
+    .object({ name: z.string(), goal: z.string().optional(), since: z.string().optional() })
+    .prefault({ name: 'Project' }),
   cfg: CfgSchema.prefault({}),
   phases: z.array(PhaseSchema).default([]),
   steps: z.array(StepSchema).default([]),
