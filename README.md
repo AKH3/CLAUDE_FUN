@@ -32,7 +32,7 @@ flowchart LR
 ## البدء السريع
 
 ```bash
-npm i -g github:AKH3/CLAUDE_FUN
+npm i -g https://github.com/AKH3/CLAUDE_FUN/archive/refs/heads/main.tar.gz
 ```
 
 ```bash
@@ -51,7 +51,7 @@ claude-fun demo --simulate
 
 يفتح هذا الأمر مشروعاً تجريبياً، وفيه "كلاود وهمي" ينفّذ الخطوات التي تعتمدها، فترى البطاقات تتحرك وتضيء أمامك.
 
-> يتطلب Node.js 22 أو أحدث، و git لعرض التعديلات (Diff).
+> يتطلب Node.js 22 أو أحدث، و git لعرض التعديلات (Diff). نثبّت من رابط الأرشيف وليس من `github:` لأن npm يترك رابطاً مكسوراً عند التثبيت العام من git.
 
 > **على Windows (PowerShell):** إذا ظهر خطأ `UnauthorizedAccess` / `PSSecurityException` فسببه سياسة تشغيل السكربتات في PowerShell، وليس الأداة. الحل الأسرع أن تكتب `npm.cmd` بدل `npm` و `claude-fun.cmd` بدل `claude-fun`. أو اسمح بالسكربتات الموقّعة لحسابك مرة واحدة بالأمر `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`، وهذا قرارك لأنه إعداد أمان.
 
@@ -168,7 +168,7 @@ Long progress narration burns tokens and buries the plan in terminal scrollback.
 ### Quick start
 
 ```bash
-npm i -g github:AKH3/CLAUDE_FUN
+npm i -g https://github.com/AKH3/CLAUDE_FUN/archive/refs/heads/main.tar.gz
 ```
 
 ```bash

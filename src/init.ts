@@ -66,7 +66,7 @@ export function init(root: string, opts: InitOptions = {}): string[] {
 
   const run = launcher();
   if (run.args[0].includes('/_npx/')) {
-    report.push('! running from a temporary npx cache; install globally (npm i -g github:AKH3/CLAUDE_FUN) so the paths below stay valid');
+    report.push('! running from a temporary npx cache; install globally (npm i -g https://github.com/AKH3/CLAUDE_FUN/archive/refs/heads/main.tar.gz) so the paths below stay valid');
   }
 
   // .mcp.json
