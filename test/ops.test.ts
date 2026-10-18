@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, applyDeltas, applyPlan, emptyState, findStep, ordered, takeUnread, fmtDirectives } from '../src/core/ops.js';
-import { summary } from '../src/core/summary.js';
+import { afterUpdate, nextStep, summary } from '../src/core/summary.js';
 
 function planned() {
   const s = emptyState('Demo');
@@ -115,5 +115,64 @@ describe('summary', () => {
     expect(text).toContain('next S1.2');
     expect(text).toContain('tok 51k/250k');
     expect(text).toContain('msg ok P1; S1.2 note:"prefer small files"');
+  });
+});
+
+describe('effort', () => {
+  it('keeps the effort Claude gives in plan and update', () => {
+    const s = emptyState('E');
+    applyPlan(s, { phases: [{ t: 'A', steps: [{ t: 'small', e: 1 }, 'no estimate'] }] });
+    expect(findStep(s, 'S1.1')!.e).toBe(1);
+    expect(findStep(s, 'S1.2')!.e).toBeUndefined();
+    applyDeltas(s, [{ id: 'S1.2', e: 3 }]);
+    expect(findStep(s, 'S1.2')!.e).toBe(3);
+  });
+});
+
+describe('ask', () => {
+  it('sends one short directive and stores the answer', () => {
+    const s = planned();
+    applyAction(s, { type: 'ask', id: 'S2.2' });
+    expect(findStep(s, 'S2.2')!.ask).toBe(true);
+    expect(fmtDirectives(takeUnread(s))).toBe('ask S2.2');
+    // the question is still listed on resume until Claude answers it
+    expect(summary(s)).toContain('ask S2.2');
+    // answering works on a step that is not approved yet, and changes nothing else
+    const { errors } = applyDeltas(s, [{ id: 'S2.2', a: 'Adds SSE so the board updates live.' }]);
+    expect(errors).toEqual([]);
+    const st = findStep(s, 'S2.2')!;
+    expect(st.a).toBe('Adds SSE so the board updates live.');
+    expect(st.ask).toBeUndefined();
+    expect(st.s).toBe('todo');
+    expect(summary(s)).not.toContain('ask S2.2');
+  });
+});
+
+describe('batch start', () => {
+  it('approves several steps and runs them in the picked order', () => {
+    const s = planned();
+    applyAction(s, { type: 'approveMany', ids: ['S2.3', 'S1.1', 'S2.1'] });
+    expect(['S2.3', 'S1.1', 'S2.1'].map((id) => findStep(s, id)!.s)).toEqual(['ok', 'ok', 'ok']);
+    expect(findStep(s, 'S2.2')!.s).toBe('todo');
+    expect(fmtDirectives(takeUnread(s))).toBe('ok S2.3,S1.1,S2.1 in order');
+
+    expect(nextStep(s)!.id).toBe('S2.3');
+    applyDeltas(s, [{ id: 'S2.3', s: 'run' }]);
+    expect(findStep(s, 'S2.3')!.q).toBeUndefined();
+    applyDeltas(s, [{ id: 'S2.3', s: 'done' }]);
+    expect(afterUpdate(s, ['S2.3'])).toBe('next S1.1 "Init repo"');
+    applyDeltas(s, [{ id: 'S1.1', s: 'run' }]);
+    applyDeltas(s, [{ id: 'S1.1', s: 'done' }]);
+    expect(nextStep(s)!.id).toBe('S2.1');
+  });
+
+  it('queues a later batch after an earlier one and skips steps it cannot start', () => {
+    const s = planned();
+    applyAction(s, { type: 'approveMany', ids: ['S2.2'] });
+    applyAction(s, { type: 'approveMany', ids: ['S2.1', 'S1.1'] });
+    expect(['S2.2', 'S2.1', 'S1.1'].map((id) => findStep(s, id)!.q)).toEqual([1, 2, 3]);
+    expect(fmtDirectives(takeUnread(s))).toBe('ok S2.2; ok S2.1,S1.1 in order');
+    applyAction(s, { type: 'reject', id: 'S2.3' });
+    expect(() => applyAction(s, { type: 'approveMany', ids: ['S2.3'] })).toThrow('nothing to start');
   });
 });

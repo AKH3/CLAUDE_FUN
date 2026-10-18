@@ -1,6 +1,6 @@
 {
   "name": "claude-fun",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drop-in visual skill-tree board for Claude Code: tiny JSON deltas in, live interactive canvas out.",
   "type": "module",
   "license": "MIT",

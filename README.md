@@ -65,6 +65,10 @@ claude-fun demo --simulate
 |---|---|
 | **شجرة المراحل** | كل مرحلة عمود (من اليمين لليسار بالعربية)، والخطوات تحتها، والمهام الفرعية متفرعة منها. العقد تضيء عند الإنجاز، والمرحلة المكتملة تتحول للذهبي. |
 | **بوابات الإذن** | البطاقة بانتظار الاعتماد تنبض، وفيها زر ✓ «اعتماد البدء» وزر ✂ «قسّم الخطوة». يوجد أيضاً زر «اعتماد المرحلة» لاعتماد مرحلة كاملة دفعة واحدة. |
+| **بدء عدة مهام بالترتيب** | اضغط `#` على البطاقات بالترتيب الذي تريده فتترقّم 1 و2 و3، ثم «ابدأ بالترتيب». ينفّذها كلاود واحدة تلو الأخرى دون توقف، ويصله سطر واحد فقط. |
+| **اسأل كلاود ❔** | زر `?` على كل بطاقة: يشرح كلاود الخطوة وفائدتها المتوقعة في 25 كلمة أو أقل. لا يُسأل إلا عند الضغط، والإجابة تُحفظ فلا تتكرر تكلفتها. |
+| **الجهد المتوقع** | يقدّر كلاود جهد كل خطوة (خفيف / متوسط / كبير) ويظهر كأعمدة صغيرة بجانب رقمها، برقم واحد فقط في الخطة. |
+| **طي المراحل** | اضغط على بطاقة المرحلة لتطوي خطواتها أو تعرضها. زر ⓘ يفتح تفاصيل المرحلة. |
 | **كبسولة النتائج** | لكل خطوة منجزة: عدد الملفات، والأسطر المضافة والمحذوفة، وحالة الاختبار، والمدة، والتوكنز. يحسبها المحرك من git بنفسه، فلا تكلّف كلاود شيئاً. |
 | **عرض التعديلات** | زر واحد يفتح diff الخطوة بالضبط، حتى بدون commits، لأن المحرك يلتقط شجرة العمل عند بداية الخطوة وعند نهايتها. |
 | **عدّاد كفاءة التوكنز** | أرقام حقيقية من سجلات Claude Code، موزعة على المراحل والخطوات ومقارنة بالميزانية. |
@@ -190,6 +194,10 @@ Run `init` inside a project folder: it refuses your home folder and drive roots,
 
 - **Skill-tree canvas:** phases as columns (mirrored in Arabic), steps beneath them, substeps branching off, and deps drawn as links. Nodes light up as they finish, and completed phases turn gold.
 - **Permission checkpoints:** *Approve*, *Split*, *Reject* and *Retry* on every card, plus *Approve phase*.
+- **Start several in order:** tap `#` on cards in the order you want (they number 1, 2, 3), then *Start in order*. Claude runs them back to back, and receives a single line.
+- **Ask Claude (`?`):** a 25-word-max explanation of what a step does and its expected benefit. Asked only when you press it, and cached on the step.
+- **Expected effort:** Claude rates each step small/medium/large (one digit in the plan), shown as bars next to its id.
+- **Collapsible phases:** click a phase card to fold or unfold its steps; ⓘ opens the phase details.
 - **Result capsules:** files changed, +/− lines, test status, duration and tokens, all computed by the engine from git snapshots taken in a throwaway index. No commits are needed and Claude spends zero tokens on them.
 - **One-click diff** for exactly what a step changed.
 - **Token efficiency meter:** real usage parsed from Claude Code's session logs, attributed to phases and steps, against a budget.

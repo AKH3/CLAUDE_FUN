@@ -12,10 +12,10 @@ import { VERSION } from '../version.js';
 
 export const INSTRUCTIONS = `Claude Board: the user follows progress on a live visual board, so keep chat to 1-2 lines and put status in deltas.
 1. Call resume first.
-2. New work: plan phases/steps with short titles, then await approval.
+2. New work: plan phases/steps as {t,e} (short title; e=effort 1 small|2 medium|3 large), then await approval.
 3. Before a step: update {id,s:"run"}. After it: {id,s:"done"|"fail",n:"<=8 words",t:"pass"|"fail"|"none"}.
-4. Only approved steps can run; the engine refuses others.
-5. "msg" lines are user directives: ok=approved, note=follow it, prio=reorder, split=call plan with parent.`;
+4. Only approved steps can run; the engine refuses others. Run steps in the order "next" gives.
+5. "msg" lines are user directives: ok=approved ("ok A,B in order"=run them back to back), note=follow it, prio=reorder, split=call plan with parent, ask=answer with update {id,a:"<=25 words: what the step does + expected benefit, in the user's language"} then carry on.`;
 
 const text = (t: string, isError = false) => ({ content: [{ type: 'text' as const, text: t }], isError });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -24,10 +24,14 @@ export function Canvas() {
   const selected = useBoard((s) => s.selected);
   const select = useBoard((s) => s.select);
   const act = useBoard((s) => s.act);
+  const collapsed = useBoard((s) => s.collapsed);
+  const isCollapsed = useBoard((s) => s.isCollapsed);
+  const toggleCollapsed = useBoard((s) => s.toggleCollapsed);
   const rtl = lang === 'ar';
   const { fitView } = useReactFlow();
 
-  const laid = useMemo(() => layout(state, usage, rtl), [state, usage, rtl]);
+  // `collapsed` is listed so the layout reruns when a phase is folded
+  const laid = useMemo(() => layout(state, usage, rtl, isCollapsed), [state, usage, rtl, collapsed, isCollapsed]);
   const [nodes, setNodes] = useState<BoardNode[]>(laid.nodes);
   const homeX = useRef(new Map<string, number>());
 
@@ -74,7 +78,7 @@ export function Canvas() {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onNodeDragStop={onNodeDragStop}
-        onNodeClick={(_e, n) => n.type !== 'lane' && select(n.id)}
+        onNodeClick={(_e, n) => (n.type === 'phase' ? toggleCollapsed(n.id) : n.type === 'step' && select(n.id))}
         onPaneClick={() => select(undefined)}
         nodesConnectable={false}
         edgesFocusable={false}

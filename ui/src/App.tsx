@@ -1,5 +1,6 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useEffect, useState } from 'react';
+import { BatchBar } from './components/BatchBar';
 import { Canvas } from './components/Canvas';
 import { DiffModal } from './components/DiffModal';
 import { Icon } from './components/Icon';
@@ -53,6 +54,7 @@ export function App() {
           <Inspector />
         </main>
         <DiffModal />
+        <BatchBar />
         <Toasts />
       </div>
     </ReactFlowProvider>

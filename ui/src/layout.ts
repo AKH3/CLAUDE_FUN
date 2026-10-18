@@ -34,6 +34,7 @@ export interface PhaseData extends Record<string, unknown> {
   complete: boolean;
   tokens: number;
   rtl: boolean;
+  collapsed: boolean;
 }
 
 export interface LaneData extends Record<string, unknown> {
@@ -48,7 +49,7 @@ export type BoardNode = StepNodeT | PhaseNodeT | LaneNodeT;
 
 const leafOf = (s: State, st: Step) => (hasChildren(s, st.id) ? descendants(s, st.id).filter((x) => !hasChildren(s, x.id)) : [st]);
 
-export function layout(s: State, usage: Usage | undefined, rtl: boolean) {
+export function layout(s: State, usage: Usage | undefined, rtl: boolean, isCollapsed: (phaseId: string) => boolean = () => false) {
   const nodes: BoardNode[] = [];
   const edges: Edge[] = [];
   const phases = phasesSorted(s);
@@ -61,6 +62,7 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean) {
     const leaves = s.steps.filter((st) => st.p === ph.id && !hasChildren(s, st.id) && st.s !== 'skip');
     const complete = phaseComplete(s, ph.id);
     const running = leaves.some(isRunning);
+    const collapsed = isCollapsed(ph.id);
 
     nodes.push({
       id: ph.id,
@@ -79,6 +81,7 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean) {
         complete,
         tokens: usage?.phases[ph.id] ?? 0,
         rtl,
+        collapsed,
       },
     });
 
@@ -122,14 +125,14 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean) {
         walk(children, depth + 1);
       }
     };
-    walk(childrenOf(s, null, ph.id), 0);
+    if (!collapsed) walk(childrenOf(s, null, ph.id), 0);
 
     nodes.unshift({
       id: `lane-${ph.id}`,
       type: 'lane',
       position: { x: x - 12, y: -12 },
       width: PHASE_W + 24,
-      height: Math.max(y, TOP + STEP_H) - GAP + 26,
+      height: collapsed ? PHASE_H + 24 : Math.max(y, TOP + STEP_H) - GAP + 26,
       draggable: false,
       selectable: false,
       focusable: false,
@@ -153,10 +156,13 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean) {
     }
   });
 
+  // dep links only between cards that are on screen (collapsed phases hide theirs)
+  const shown = new Set(nodes.map((n) => n.id));
   for (const st of s.steps) {
+    if (!shown.has(st.id)) continue;
     for (const d of st.deps) {
       const dep = s.steps.find((x) => x.id === d);
-      if (!dep) continue;
+      if (!dep || !shown.has(dep.id)) continue;
       const same = dep.p === st.p;
       const met = dep.s === 'done' || dep.s === 'skip';
       edges.push({

@@ -8,8 +8,11 @@ export const kfmt = (n: number) => (n >= 1_000_000 ? `${(n / 1e6).toFixed(1)}M` 
 
 export const usedTokens = (u?: Usage) => (u ? u.total.in + u.total.cw + u.total.out : 0);
 
+/** Next approved step whose deps are met: queued (batch-started) steps first, in queue order. */
 export function nextStep(s: State): Step | undefined {
-  return leaves(s).find((x) => x.s === 'ok' && depsMet(s, x));
+  const ready = leaves(s).filter((x) => x.s === 'ok' && depsMet(s, x));
+  const queued = ready.filter((x) => x.q !== undefined).sort((x, y) => x.q! - y.q!);
+  return queued[0] ?? ready[0];
 }
 
 export function summary(s: State, opts: { usage?: Usage; msgs?: Directive[]; url?: string } = {}): string {
@@ -49,6 +52,11 @@ export function summary(s: State, opts: { usage?: Usage; msgs?: Directive[]; url
 
   if (!running.length && !next && !waiting.length && done === ls.length) lines.push('all done');
   else if (!running.length && !next && waiting.length) lines.push('-> await');
+
+  // questions Claude was told about but hasn't answered yet (e.g. the session ended)
+  const fresh = new Set(opts.msgs?.filter((d) => d.k === 'ask').map((d) => d.s));
+  const asks = s.steps.filter((x) => x.ask && !fresh.has(x.id));
+  if (asks.length) lines.push(`ask ${asks.map((x) => x.id).slice(0, 4).join(',')}`);
 
   if (opts.msgs?.length) lines.push(`msg ${fmtDirectives(opts.msgs)}`);
   if (opts.url) lines.push(`board ${opts.url}`);

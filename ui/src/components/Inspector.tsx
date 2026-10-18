@@ -3,6 +3,7 @@ import type { Phase, Step } from '../../../src/core/schema';
 import { childrenOf, depsMet, hasChildren } from '../../../src/core/tree';
 import { duration, kfmt, STATUS_COLOR, STATUS_ICON } from '../format';
 import { useBoard, useT } from '../store';
+import { Effort } from './Effort';
 import { Icon, type IconName } from './Icon';
 
 function Btn({
@@ -166,7 +167,15 @@ function StepPanel({ st }: { st: Step }) {
           </div>
         )}
         {st.by === 'user' && <div className="mt-2 text-[12px] text-gold">★ {t('by.user')}</div>}
+        {st.e && (
+          <div className="mt-2 flex items-center gap-1.5 text-[12px]">
+            <span className="text-muted">{t('effort')}:</span>
+            <Effort e={st.e} label />
+          </div>
+        )}
       </div>
+
+      <AskSection st={st} />
 
       <Section>
         <div className="grid grid-cols-2 gap-2">
@@ -286,6 +295,47 @@ function StepPanel({ st }: { st: Step }) {
         )}
       </Section>
     </>
+  );
+}
+
+function AskSection({ st }: { st: Step }) {
+  const t = useT();
+  const act = useBoard((s) => s.act);
+  const ask = () => act({ type: 'ask', id: st.id });
+  return (
+    <Section>
+      {st.a ? (
+        <div className="rounded-lg bg-ok/10 px-3 py-2 text-[13px]">
+          <div className="mb-1 flex items-center gap-1 text-[11px] text-ok">
+            <Icon name="help" size={12} />
+            {t('ask.title')}
+            {!st.ask && (
+              <button type="button" onClick={ask} className="ms-auto rounded px-1 text-muted hover:text-text">
+                {t('ask.again')}
+              </button>
+            )}
+          </div>
+          <div dir="auto" className="leading-relaxed">
+            {st.a}
+          </div>
+          {st.ask && <div className="mt-1.5 animate-pulse text-[11.5px] text-todo">{t('ask.pending')}</div>}
+        </div>
+      ) : st.ask ? (
+        <div className="flex items-center gap-2 rounded-lg bg-todo/10 px-3 py-2.5 text-[13px] text-todo">
+          <Icon name="help" size={15} className="animate-pulse" />
+          {t('ask.pending')}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={ask}
+          className="flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-start text-[13px] text-muted transition hover:border-ok hover:text-text"
+        >
+          <Icon name="help" size={15} className="text-ok" />
+          {t('ask.cta')}
+        </button>
+      )}
+    </Section>
   );
 }
 

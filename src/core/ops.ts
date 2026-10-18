@@ -71,7 +71,7 @@ export function fmtDirective(d: Directive): string {
   const t = d.s ?? '';
   switch (d.k) {
     case 'ok':
-      return `ok ${t}`;
+      return d.x ? `ok ${d.x} in order` : `ok ${t}`;
     case 'no':
       return `skip ${t}`;
     case 'split':
@@ -88,6 +88,8 @@ export function fmtDirective(d: Directive): string {
       return `retry ${t}`;
     case 'guard':
       return `guard ${d.x}`;
+    case 'ask':
+      return `ask ${t}`;
   }
 }
 
@@ -164,6 +166,7 @@ function addSteps(
       o: o++,
       deps,
       d: spec.d,
+      e: spec.e,
       by,
       at: {},
     });
@@ -238,8 +241,14 @@ export function applyDeltas(s: State, ops: Delta[], git: GitCtx = {}) {
     }
     if (op.n !== undefined) st.n = op.n;
     if (op.t) st.r = { ...st.r, t: op.t };
+    if (op.e) st.e = op.e;
+    if (op.a) {
+      st.a = op.a;
+      st.ask = undefined;
+    }
     applied.push(op.id);
-    log(s, `${st.id} ${op.s ?? 'note'}${op.n ? ` · ${op.n}` : ''}`, op.s ?? 'note');
+    const kind = op.s ?? (op.a ? 'answer' : 'note');
+    log(s, `${st.id} ${kind}${op.n ? ` · ${op.n}` : ''}`, kind);
   }
 
   rollup(s, before);
@@ -259,6 +268,7 @@ function transition(s: State, st: Step, to: StepStatus, git: GitCtx): string | u
       if (st.s === 'ok' || !st.base) st.base = git.tree;
       st.at = { run: now() };
     }
+    st.q = undefined;
   }
 
   if (to === 'done' || to === 'fail') {
@@ -305,6 +315,26 @@ function action(s: State, a: Action): string {
       for (const x of s.steps) if (x.p === a.id && x.s === 'todo') x.s = 'ok';
       directive(s, 'ok', a.id);
       return `approved ${a.id}`;
+    }
+    case 'approveMany': {
+      // Start several steps in the order the user picked them: they get queue
+      // positions after any earlier batch, and Claude hears one directive.
+      const picked = [...new Set(a.ids)].map((id) => need(s, id)).filter((x) => !FINISHED.includes(x.s) && x.s !== 'run');
+      if (!picked.length) throw new Error('nothing to start');
+      let q = Math.max(0, ...s.steps.map((x) => x.q ?? 0));
+      for (const st of picked) {
+        for (const x of [st, ...descendants(s, st.id)]) if (x.s === 'todo' || x.s === 'block') x.s = 'ok';
+        for (const x of hasChildren(s, st.id) ? descendants(s, st.id).filter((d) => !hasChildren(s, d.id)) : [st]) x.q = ++q;
+      }
+      const ids = picked.map((x) => x.id);
+      directive(s, 'ok', ids[0], ids.length > 1 ? ids.join(',') : undefined);
+      return `approved ${ids.join(' > ')}`;
+    }
+    case 'ask': {
+      const st = need(s, a.id);
+      st.ask = true;
+      directive(s, 'ask', st.id);
+      return `ask ${st.id}`;
     }
     case 'reject': {
       const st = need(s, a.id);

@@ -21,6 +21,10 @@ interface BoardStore {
   lang: Lang;
   theme: Theme;
   toasts: Toast[];
+  /** Steps picked for a batch start, in the order the user picked them. */
+  batch: string[];
+  /** Collapsed phases, keyed by `project|phaseId` so boards don't share them. */
+  collapsed: Record<string, boolean>;
   setState: (s: State) => void;
   setUsage: (u: Usage) => void;
   setConnected: (v: boolean) => void;
@@ -34,7 +38,13 @@ interface BoardStore {
   toast: (kind: Toast['kind'], text: string) => void;
   dropToast: (id: number) => void;
   act: (a: Action, sentLabel?: string) => Promise<boolean>;
+  toggleBatch: (id: string) => void;
+  clearBatch: () => void;
+  isCollapsed: (phaseId: string) => boolean;
+  toggleCollapsed: (phaseId: string) => void;
 }
+
+const PICKABLE = ['todo', 'ok', 'block'];
 
 // ?lang=en&theme=light in the URL wins over the remembered choice
 const saved = <T extends string>(key: string, fallback: T): T => {
@@ -51,7 +61,16 @@ const save = (key: string, v: string) => {
   } catch {}
 };
 
+const savedJson = <T,>(key: string, fallback: T): T => {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? '') as T;
+  } catch {
+    return fallback;
+  }
+};
+
 let toastSeq = 0;
+const collapseKey = (s: State | undefined, phaseId: string) => `${s?.project.name ?? ''}|${phaseId}`;
 
 export const useBoard = create<BoardStore>((set, get) => ({
   git: false,
@@ -59,7 +78,15 @@ export const useBoard = create<BoardStore>((set, get) => ({
   lang: saved<Lang>('cb.lang', 'ar'),
   theme: saved<Theme>('cb.theme', 'dark'),
   toasts: [],
-  setState: (state) => set({ state, problem: undefined }),
+  batch: [],
+  collapsed: savedJson<Record<string, boolean>>('cb.collapsed', {}),
+  setState: (state) =>
+    set((cur) => ({
+      state,
+      problem: undefined,
+      // drop picks that started, finished or vanished since
+      batch: cur.batch.filter((id) => PICKABLE.includes(state.steps.find((x) => x.id === id)?.s ?? '')),
+    })),
   setUsage: (usage) => set({ usage }),
   setConnected: (connected) => set({ connected }),
   setProblem: (problem) => set({ problem }),
@@ -96,6 +123,17 @@ export const useBoard = create<BoardStore>((set, get) => ({
       get().toast('error', e?.message ?? String(e));
       return false;
     }
+  },
+  toggleBatch: (id) => set((s) => ({ batch: s.batch.includes(id) ? s.batch.filter((x) => x !== id) : [...s.batch, id] })),
+  clearBatch: () => set({ batch: [] }),
+  isCollapsed: (phaseId) => !!get().collapsed[collapseKey(get().state, phaseId)],
+  toggleCollapsed: (phaseId) => {
+    const key = collapseKey(get().state, phaseId);
+    const collapsed = { ...get().collapsed };
+    if (collapsed[key]) delete collapsed[key];
+    else collapsed[key] = true;
+    save('cb.collapsed', JSON.stringify(collapsed));
+    set({ collapsed });
   },
 }));
 

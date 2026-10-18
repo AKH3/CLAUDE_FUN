@@ -1,8 +1,10 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
+import type { Step } from '../../../src/core/schema';
 import { duration, kfmt, PHASE_PALETTE, STATUS_COLOR, STATUS_ICON } from '../format';
 import type { LaneNodeT, PhaseNodeT, StepNodeT } from '../layout';
 import { useBoard, useT } from '../store';
+import { Effort } from './Effort';
 import { Icon } from './Icon';
 
 const sides = (rtl: boolean) => ({ lead: rtl ? Position.Right : Position.Left, trail: rtl ? Position.Left : Position.Right });
@@ -41,6 +43,52 @@ function MiniBtn({ icon, label, onClick, color }: { icon: Parameters<typeof Icon
   );
 }
 
+/** "?" on a card: asks Claude once, then the cached answer opens for free. */
+function AskBtn({ st }: { st: Step }) {
+  const t = useT();
+  const act = useBoard((s) => s.act);
+  const select = useBoard((s) => s.select);
+  const tone = st.a ? 'text-ok' : st.ask ? 'animate-pulse text-todo' : 'text-muted hover:text-text';
+  return (
+    <button
+      type="button"
+      title={t('act.ask')}
+      aria-label={t('act.ask')}
+      className={`nodrag grid size-5 place-items-center rounded-full transition hover:scale-110 ${tone}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        select(st.id);
+        if (!st.a && !st.ask) act({ type: 'ask', id: st.id });
+      }}
+    >
+      <Icon name="help" size={15} />
+    </button>
+  );
+}
+
+/** Picks a step for a batch start; shows its position in the batch once picked. */
+function PickBtn({ id, n }: { id: string; n: number }) {
+  const t = useT();
+  const toggle = useBoard((s) => s.toggleBatch);
+  return (
+    <button
+      type="button"
+      title={t('batch.pick')}
+      aria-label={t('batch.pick')}
+      aria-pressed={n > 0}
+      className={`nodrag grid size-6 place-items-center rounded-full border font-mono text-[11px] font-bold transition hover:scale-110 ${
+        n ? 'border-ok bg-ok text-white' : 'border-dashed border-muted text-muted hover:text-text'
+      }`}
+      onClick={(e) => {
+        e.stopPropagation();
+        toggle(id);
+      }}
+    >
+      {n || '#'}
+    </button>
+  );
+}
+
 export const StepNode = memo(function StepNode({ data, selected }: NodeProps<StepNodeT>) {
   const { step: st, locked, container, kids, kidsDone, tokens, rtl } = data;
   const t = useT();
@@ -48,6 +96,8 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
   const status = locked ? 'locked' : st.s;
   const color = STATUS_COLOR[status];
   const lit = useFlash(st.s === 'done');
+  const pick = useBoard((s) => s.batch.indexOf(st.id)) + 1;
+  const pickable = !container && !locked && ['todo', 'ok', 'block'].includes(st.s);
   const { lead, trail } = sides(rtl);
   const cls = [
     'relative flex h-full flex-col rounded-xl border border-s-4 bg-panel px-3 py-2 shadow-[var(--shadow)] transition-[opacity,transform]',
@@ -56,6 +106,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
     lit ? 'node-lit' : '',
     locked || st.s === 'skip' ? 'opacity-55' : '',
     selected ? 'ring-2 ring-offset-0' : '',
+    pick ? 'outline-2 outline-offset-2 outline-ok' : '',
   ].join(' ');
 
   return (
@@ -74,6 +125,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
         </span>
         {st.by === 'user' && <Icon name="star" size={11} fill className="text-gold" />}
         {st.un && <Icon name="note" size={12} className="text-ok" />}
+        {st.e && <Effort e={st.e} />}
         <span className="ms-auto flex items-center gap-1">
           {tokens > 0 && (
             <span className="flex items-center gap-0.5 font-mono" dir="ltr" title={t('cap.tokens')}>
@@ -81,6 +133,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
               {kfmt(tokens)}
             </span>
           )}
+          <AskBtn st={st} />
         </span>
       </div>
 
@@ -102,6 +155,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
           <>
             <span className="text-todo">{t('status.todo')}</span>
             <span className="ms-auto flex gap-1">
+              <PickBtn id={st.id} n={pick} />
               <MiniBtn icon="scissors" label={t('act.split')} color="var(--ok)" onClick={() => act({ type: 'split', id: st.id }, `split ${st.id}`)} />
               <MiniBtn icon="check" label={t('act.approve')} color="var(--done)" onClick={() => act({ type: 'approve', id: st.id })} />
             </span>
@@ -139,7 +193,14 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
             <span dir="ltr">{st.deps.join(', ')}</span>
           </span>
         ) : (
-          <span style={{ color }}>{t(`status.${st.s}` as const)}</span>
+          <>
+            <span style={{ color }}>{t(`status.${st.s}` as const)}</span>
+            {pickable && (
+              <span className="ms-auto">
+                <PickBtn id={st.id} n={pick} />
+              </span>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -147,9 +208,11 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
 });
 
 export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>) {
-  const { phase, index, done, total, todo, complete, running, tokens, rtl } = data;
+  const { phase, index, done, total, todo, complete, running, tokens, rtl, collapsed } = data;
   const t = useT();
   const act = useBoard((s) => s.act);
+  const select = useBoard((s) => s.select);
+  const toggle = useBoard((s) => s.toggleCollapsed);
   const burst = useFlash(complete, 1200);
   const { lead, trail } = sides(rtl);
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -163,6 +226,19 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>
       <Handle type="target" id="in" position={lead} />
       <Handle type="source" id="out" position={trail} />
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          title={collapsed ? t('phase.expand') : t('phase.collapse')}
+          aria-label={collapsed ? t('phase.expand') : t('phase.collapse')}
+          className="nodrag -ms-1 grid size-6 shrink-0 place-items-center rounded-md text-muted transition hover:bg-bg hover:text-text"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggle(phase.id);
+          }}
+        >
+          <Icon name="chevron" size={15} className={`transition-transform ${collapsed ? (rtl ? 'rotate-180' : '') : 'rotate-90'}`} />
+        </button>
         <span className="rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold text-white" style={{ background: accent }} dir="ltr">
           {phase.id}
         </span>
@@ -208,6 +284,9 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>
             {total} {t('phase.steps')}
           </span>
         )}
+        <span className={todo > 0 && !complete ? '' : 'ms-auto'}>
+          <MiniBtn icon="info" label={t('phase.details')} color="var(--ok)" onClick={() => select(phase.id)} />
+        </span>
       </div>
     </div>
   );

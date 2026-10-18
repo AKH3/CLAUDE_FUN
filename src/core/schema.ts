@@ -6,7 +6,7 @@ export const STEP_STATUS = ['todo', 'ok', 'run', 'done', 'fail', 'block', 'skip'
 export const CLAUDE_STATUS = ['run', 'done', 'fail', 'block'] as const;
 export const GUARD_MODES = ['strict', 'sensitive', 'off'] as const;
 export const TEST_STATUS = ['pass', 'fail', 'none'] as const;
-export const DIRECTIVE_KINDS = ['ok', 'no', 'split', 'note', 'prio', 'edit', 'add', 'retry', 'guard'] as const;
+export const DIRECTIVE_KINDS = ['ok', 'no', 'split', 'note', 'prio', 'edit', 'add', 'retry', 'guard', 'ask'] as const;
 
 export const DEFAULT_PROTECT = [
   '.env*',
@@ -37,6 +37,10 @@ export const StepSchema = z.object({
   n: z.string().optional(), // latest note from Claude
   un: z.string().optional(), // latest note from the user
   d: z.string().optional(), // optional detail
+  e: z.number().int().min(1).max(3).optional(), // effort Claude expects: 1 small, 2 medium, 3 large
+  a: z.string().optional(), // Claude's answer to the user's "?" question
+  ask: z.boolean().optional(), // a "?" question is waiting for Claude
+  q: z.number().optional(), // queue position from a batch start; lower runs first
   by: z.enum(['claude', 'user']).optional(),
   r: ResultSchema.optional(),
   base: z.string().optional(), // git tree when the step started
@@ -94,6 +98,7 @@ export const StepInSchema = z.union([
     t: z.string(),
     deps: z.array(z.string()).optional().describe('ids, or "#n" = nth step in this list'),
     d: z.string().optional(),
+    e: z.number().int().min(1).max(3).optional().describe('effort 1-3'),
   }),
 ]);
 
@@ -114,6 +119,8 @@ export const DeltaSchema = z.object({
   s: z.enum(CLAUDE_STATUS).optional(),
   n: z.string().max(160).optional().describe('<=8 words'),
   t: z.enum(TEST_STATUS).optional().describe('tests'),
+  e: z.number().int().min(1).max(3).optional().describe('effort 1-3'),
+  a: z.string().max(300).optional().describe('answer to ask'),
 });
 
 export const UpdateInput = { ops: z.array(DeltaSchema).min(1) };
@@ -128,6 +135,8 @@ export const AwaitInput = {
 export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approve'), id: z.string() }),
   z.object({ type: z.literal('approvePhase'), id: z.string() }),
+  z.object({ type: z.literal('approveMany'), ids: z.array(z.string()).min(1).max(50) }),
+  z.object({ type: z.literal('ask'), id: z.string() }),
   z.object({ type: z.literal('reject'), id: z.string() }),
   z.object({ type: z.literal('retry'), id: z.string() }),
   z.object({ type: z.literal('split'), id: z.string() }),

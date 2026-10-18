@@ -57,6 +57,7 @@ export async function runDemo(opts: { port: number; open: boolean; simulate: boo
       const msgs = s.inbox.some((d) => !d.ack) ? store.mutate((st) => takeUnread(st)).result : [];
       for (const m of msgs) {
         if (m.k === 'split' && m.s) store.mutate((st) => applyPlan(st, { parent: m.s, steps: ['تحليل', 'تنفيذ', 'مراجعة'] }));
+        if (m.k === 'ask' && m.s) store.mutate((st) => applyDeltas(st, [{ id: m.s!, a: 'خطوة تجريبية: تبني جزءاً صغيراً من المشروع، وفائدتها أن ما بعدها يعتمد عليها فتقل الأخطاء لاحقاً.' }]));
       }
       const running = leaves(store.read()).find((x) => x.s === 'run');
       if (running) {
