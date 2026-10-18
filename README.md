@@ -31,6 +31,8 @@ flowchart LR
 
 ## البدء السريع
 
+> جديد على الطرفية أو Claude Code؟ ابدأ من [دليل التشغيل للمبتدئين](docs/GUIDE-ar.md).
+
 ```bash
 npm i -g https://github.com/AKH3/CLAUDE_FUN/archive/refs/heads/main.tar.gz
 ```
