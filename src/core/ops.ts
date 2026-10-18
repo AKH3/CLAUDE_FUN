@@ -11,6 +11,22 @@ import {
   type StepIn,
   type StepStatus,
 } from './schema.js';
+import {
+  FINISHED,
+  childrenOf,
+  descendants,
+  findPhase,
+  findStep,
+  hasChildren,
+  leaves,
+  num,
+  phaseComplete,
+  phaseNum,
+  phasesSorted,
+  unmetDeps,
+} from './tree.js';
+
+export * from './tree.js';
 
 const LOG_CAP = 200;
 const INBOX_CAP = 100;
@@ -19,77 +35,6 @@ export const now = () => new Date().toISOString();
 
 export function emptyState(name: string, goal?: string): State {
   return StateSchema.parse({ project: { name, goal, since: now() } });
-}
-
-// ---------- lookups & ordering ----------
-
-export const findStep = (s: State, id: string) => s.steps.find((x) => x.id === id);
-export const findPhase = (s: State, id: string) => s.phases.find((x) => x.id === id);
-
-const num = (id: string) => {
-  const m = /(\d+)$/.exec(id);
-  return m ? Number(m[1]) : 0;
-};
-
-export function phaseNum(s: State, phaseId: string): number {
-  const m = /^P(\d+)$/.exec(phaseId);
-  if (m) return Number(m[1]);
-  return s.phases.findIndex((p) => p.id === phaseId) + 1;
-}
-
-export function phasesSorted(s: State) {
-  return [...s.phases].sort((a, b) => a.o - b.o);
-}
-
-export function childrenOf(s: State, parent: string | null, phase?: string): Step[] {
-  return s.steps
-    .filter((x) => x.parent === parent && (parent !== null || x.p === phase))
-    .sort((a, b) => a.o - b.o);
-}
-
-export const hasChildren = (s: State, id: string) => s.steps.some((x) => x.parent === id);
-
-export function descendants(s: State, id: string): Step[] {
-  const out: Step[] = [];
-  const walk = (pid: string) => {
-    for (const c of s.steps.filter((x) => x.parent === pid)) {
-      out.push(c);
-      walk(c.id);
-    }
-  };
-  walk(id);
-  return out;
-}
-
-/** Steps in work order: phase order, then sibling order, depth-first. */
-export function ordered(s: State): Step[] {
-  const out: Step[] = [];
-  const walk = (list: Step[]) => {
-    for (const st of list) {
-      out.push(st);
-      walk(childrenOf(s, st.id));
-    }
-  };
-  for (const p of phasesSorted(s)) walk(childrenOf(s, null, p.id));
-  return out;
-}
-
-export const leaves = (s: State) => ordered(s).filter((x) => !hasChildren(s, x.id));
-
-const FINISHED: StepStatus[] = ['done', 'skip'];
-
-export function depsMet(s: State, st: Step): boolean {
-  return st.deps.every((d) => {
-    const dep = findStep(s, d);
-    return !dep || FINISHED.includes(dep.s);
-  });
-}
-
-export function unmetDeps(s: State, st: Step): string[] {
-  return st.deps.filter((d) => {
-    const dep = findStep(s, d);
-    return dep && !FINISHED.includes(dep.s);
-  });
 }
 
 // ---------- bookkeeping ----------
@@ -186,11 +131,6 @@ export function rollup(s: State, before?: Map<string, boolean>) {
       if (!before.get(p.id) && phaseComplete(s, p.id)) log(s, `${p.id} complete`, 'phase');
     }
   }
-}
-
-export function phaseComplete(s: State, phaseId: string) {
-  const ls = s.steps.filter((x) => x.p === phaseId && !hasChildren(s, x.id));
-  return ls.length > 0 && ls.every((x) => FINISHED.includes(x.s));
 }
 
 export const phaseSnapshot = (s: State) =>
@@ -376,6 +316,7 @@ function action(s: State, a: Action): string {
       const st = need(s, a.id);
       for (const x of [st, ...descendants(s, st.id)]) {
         x.s = 'ok';
+        x.n = undefined;
         x.r = undefined;
         x.base = undefined;
         x.head = undefined;

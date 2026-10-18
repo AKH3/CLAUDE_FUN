@@ -1,0 +1,232 @@
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { duration, kfmt, PHASE_PALETTE, STATUS_COLOR, STATUS_ICON } from '../format';
+import type { LaneNodeT, PhaseNodeT, StepNodeT } from '../layout';
+import { useBoard, useT } from '../store';
+import { Icon } from './Icon';
+
+const sides = (rtl: boolean) => ({ lead: rtl ? Position.Right : Position.Left, trail: rtl ? Position.Left : Position.Right });
+
+/** Adds a class for a moment when `trigger` flips to true (status transitions). */
+function useFlash(trigger: boolean, ms = 900) {
+  const prev = useRef(trigger);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (trigger && !prev.current) {
+      setOn(true);
+      const t = setTimeout(() => setOn(false), ms);
+      prev.current = trigger;
+      return () => clearTimeout(t);
+    }
+    prev.current = trigger;
+  }, [trigger, ms]);
+  return on;
+}
+
+function MiniBtn({ icon, label, onClick, color }: { icon: Parameters<typeof Icon>[0]['name']; label: string; onClick: () => void; color: string }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      className="nodrag grid size-6 place-items-center rounded-md border border-line bg-panel2 text-muted transition hover:scale-110 hover:text-text"
+      style={{ ['--c' as string]: color }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <Icon name={icon} size={13} />
+    </button>
+  );
+}
+
+export const StepNode = memo(function StepNode({ data, selected }: NodeProps<StepNodeT>) {
+  const { step: st, locked, container, kids, kidsDone, tokens, rtl } = data;
+  const t = useT();
+  const act = useBoard((s) => s.act);
+  const status = locked ? 'locked' : st.s;
+  const color = STATUS_COLOR[status];
+  const lit = useFlash(st.s === 'done');
+  const { lead, trail } = sides(rtl);
+  const cls = [
+    'relative flex h-full flex-col rounded-xl border border-s-4 bg-panel px-3 py-2 shadow-[var(--shadow)] transition-[opacity,transform]',
+    st.s === 'todo' && !locked ? 'node-todo' : '',
+    st.s === 'run' ? 'node-run' : '',
+    lit ? 'node-lit' : '',
+    locked || st.s === 'skip' ? 'opacity-55' : '',
+    selected ? 'ring-2 ring-offset-0' : '',
+  ].join(' ');
+
+  return (
+    <div className={cls} style={{ borderColor: color, ['--tw-ring-color' as string]: color }}>
+      <Handle type="target" id="lead" position={lead} />
+      <Handle type="target" id="trail-in" position={trail} />
+      <Handle type="source" id="trail-out" position={trail} />
+      <Handle type="source" id="bottom" position={Position.Bottom} style={rtl ? { left: 'auto', right: 14 } : { left: 14 }} />
+
+      <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <span className="grid size-4 place-items-center rounded-full" style={{ background: color, color: 'var(--bg)' }}>
+          <Icon name={STATUS_ICON[status]} size={10} />
+        </span>
+        <span className="font-mono" dir="ltr">
+          {st.id}
+        </span>
+        {st.by === 'user' && <Icon name="star" size={11} fill className="text-gold" />}
+        {st.un && <Icon name="note" size={12} className="text-ok" />}
+        <span className="ms-auto flex items-center gap-1">
+          {tokens > 0 && (
+            <span className="flex items-center gap-0.5 font-mono" dir="ltr" title={t('cap.tokens')}>
+              <Icon name="bolt" size={11} />
+              {kfmt(tokens)}
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div dir="auto" className={`mt-1 line-clamp-2 text-[13px] leading-snug font-medium ${st.s === 'skip' ? 'line-through' : ''}`}>
+        {st.t}
+      </div>
+
+      <div className="mt-auto flex items-center gap-1.5 text-[11px]">
+        {container ? (
+          <>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel2">
+              <div className="h-full rounded-full bg-done transition-all" style={{ width: `${(kidsDone / Math.max(kids, 1)) * 100}%` }} />
+            </div>
+            <span className="font-mono text-muted" dir="ltr">
+              {kidsDone}/{kids}
+            </span>
+          </>
+        ) : st.s === 'todo' && !locked ? (
+          <>
+            <span className="text-todo">{t('status.todo')}</span>
+            <span className="ms-auto flex gap-1">
+              <MiniBtn icon="scissors" label={t('act.split')} color="var(--ok)" onClick={() => act({ type: 'split', id: st.id }, `split ${st.id}`)} />
+              <MiniBtn icon="check" label={t('act.approve')} color="var(--done)" onClick={() => act({ type: 'approve', id: st.id })} />
+            </span>
+          </>
+        ) : st.s === 'run' ? (
+          <>
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-panel2">
+              <div className="run-bar h-full w-full" />
+            </div>
+            <span className="text-run">{t('status.run')}</span>
+          </>
+        ) : st.s === 'done' || st.s === 'fail' ? (
+          <span className="flex w-full items-center gap-2 text-muted" dir="ltr">
+            {st.r?.f !== undefined && (
+              <span className="flex items-center gap-0.5">
+                <Icon name="file" size={11} />
+                {st.r.f}
+              </span>
+            )}
+            {st.r?.ins !== undefined && (
+              <span className="font-mono">
+                <span className="text-done">+{st.r.ins}</span> <span className="text-fail">−{st.r.del ?? 0}</span>
+              </span>
+            )}
+            {st.r?.t && st.r.t !== 'none' && (
+              <span className={`rounded px-1 ${st.r.t === 'pass' ? 'bg-done/15 text-done' : 'bg-fail/15 text-fail'}`}>
+                {st.r.t === 'pass' ? '✓ tests' : '✗ tests'}
+              </span>
+            )}
+            <span className="ms-auto">{duration(st.at.run, st.at.end)}</span>
+          </span>
+        ) : locked ? (
+          <span className="flex items-center gap-1 text-muted">
+            <Icon name="lock" size={11} />
+            <span dir="ltr">{st.deps.join(', ')}</span>
+          </span>
+        ) : (
+          <span style={{ color }}>{t(`status.${st.s}` as const)}</span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>) {
+  const { phase, index, done, total, todo, complete, running, tokens, rtl } = data;
+  const t = useT();
+  const act = useBoard((s) => s.act);
+  const burst = useFlash(complete, 1200);
+  const { lead, trail } = sides(rtl);
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const accent = PHASE_PALETTE[index % PHASE_PALETTE.length];
+
+  return (
+    <div
+      className={`relative flex h-full flex-col rounded-2xl border-2 bg-panel2 px-3.5 py-2.5 shadow-[var(--shadow)] ${burst ? 'burst' : ''}`}
+      style={{ borderColor: complete ? 'var(--gold)' : running ? 'var(--run)' : 'var(--line)' }}
+    >
+      <Handle type="target" id="in" position={lead} />
+      <Handle type="source" id="out" position={trail} />
+      <div className="flex items-center gap-2">
+        <span className="rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold text-white" style={{ background: accent }} dir="ltr">
+          {phase.id}
+        </span>
+        <span dir="auto" className="truncate text-[15px] font-semibold">
+          {phase.t}
+        </span>
+        {complete && <Icon name="star" size={16} fill className="ms-auto shrink-0 text-gold" />}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${pct}%`, background: complete ? 'var(--gold)' : `linear-gradient(90deg, ${accent}, var(--done))` }}
+          />
+        </div>
+        <span className="font-mono text-[11px] text-muted" dir="ltr">
+          {done}/{total}
+        </span>
+      </div>
+      <div className="mt-auto flex items-center gap-2 text-[11px] text-muted">
+        {tokens > 0 && (
+          <span className="flex items-center gap-0.5 font-mono" dir="ltr">
+            <Icon name="bolt" size={11} />
+            {kfmt(tokens)}
+          </span>
+        )}
+        {complete ? (
+          <span className="text-gold">{t('phase.complete')}</span>
+        ) : todo > 0 ? (
+          <button
+            type="button"
+            className="nodrag ms-auto flex items-center gap-1 rounded-md bg-done/15 px-2 py-0.5 font-medium text-done transition hover:bg-done/25"
+            onClick={(e) => {
+              e.stopPropagation();
+              act({ type: 'approvePhase', id: phase.id });
+            }}
+          >
+            <Icon name="check" size={12} />
+            {t('act.approvePhase')} ({todo})
+          </button>
+        ) : (
+          <span>
+            {total} {t('phase.steps')}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+export const LaneNode = memo(function LaneNode({ data }: NodeProps<LaneNodeT>) {
+  return (
+    <div
+      className="h-full w-full rounded-[22px] border border-dashed"
+      style={{
+        borderColor: data.complete ? 'color-mix(in srgb, var(--gold) 45%, transparent)' : 'var(--line)',
+        background: data.active
+          ? 'color-mix(in srgb, var(--run) 7%, transparent)'
+          : data.complete
+            ? 'color-mix(in srgb, var(--gold) 5%, transparent)'
+            : 'color-mix(in srgb, var(--panel) 35%, transparent)',
+      }}
+    />
+  );
+});
+
+export const nodeTypes = { step: StepNode, phase: PhaseNode, lane: LaneNode };

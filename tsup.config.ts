@@ -10,7 +10,7 @@ export default defineConfig({
   target: 'node22',
   outDir: 'dist',
   splitting: true, // lazy subcommands -> hooks don't load the server/MCP SDK
-  clean: false, // dist/ui is produced by vite
+  clean: ['*.js'], // only our chunks; dist/ui is produced by vite
   minify: true,
   sourcemap: false,
   noExternal: [/.*/], // ship one self-contained folder; no runtime deps

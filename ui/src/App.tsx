@@ -1,0 +1,60 @@
+import { ReactFlowProvider } from '@xyflow/react';
+import { useEffect, useState } from 'react';
+import { Canvas } from './components/Canvas';
+import { DiffModal } from './components/DiffModal';
+import { Icon } from './components/Icon';
+import { Inspector } from './components/Inspector';
+import { ActivityPanel, EmptyState, Toasts } from './components/Panels';
+import { TopBar } from './components/TopBar';
+import { connect } from './sse';
+import { useBoard } from './store';
+
+export function App() {
+  const state = useBoard((s) => s.state);
+  const lang = useBoard((s) => s.lang);
+  const theme = useBoard((s) => s.theme);
+  const problem = useBoard((s) => s.problem);
+  const [activity, setActivity] = useState(false);
+
+  useEffect(() => connect(), []);
+  useEffect(() => {
+    const html = document.documentElement;
+    html.lang = lang;
+    html.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    html.dataset.theme = theme;
+  }, [lang, theme]);
+  useEffect(() => {
+    if (state) document.title = `${state.project.name} · Claude Board`;
+  }, [state?.project.name]);
+
+  if (!state) {
+    return (
+      <div className="grid h-full place-items-center text-muted">
+        <div className="flex items-center gap-2">
+          <span className="size-2 animate-ping rounded-full bg-run" />
+          Claude Board…
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ReactFlowProvider>
+      <div className="flex h-full flex-col">
+        <TopBar onActivity={() => setActivity((v) => !v)} />
+        {problem && (
+          <div className="flex items-center gap-2 bg-fail/15 px-4 py-2 text-[13px] text-fail" dir="ltr">
+            <Icon name="alert" size={14} /> {problem}
+          </div>
+        )}
+        <main className="relative min-h-0 flex-1 overflow-hidden">
+          {state.phases.length ? <Canvas /> : <EmptyState />}
+          {activity && <ActivityPanel onClose={() => setActivity(false)} />}
+          <Inspector />
+        </main>
+        <DiffModal />
+        <Toasts />
+      </div>
+    </ReactFlowProvider>
+  );
+}
