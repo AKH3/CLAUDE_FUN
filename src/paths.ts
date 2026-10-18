@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, parse, resolve } from 'node:path';
 
 export const BOARD_DIR = '.claude-board';
 
@@ -28,12 +29,35 @@ export function boardPaths(root: string): BoardPaths {
   };
 }
 
-/** Project root: nearest ancestor with .claude-board, else nearest with .git, else the start dir. */
+// Real, case-folded path: on Windows this also expands 8.3 short names (C:\Users\ABDULK~1).
+function canonical(p: string): string {
+  let out = resolve(p);
+  try {
+    out = realpathSync.native(out);
+  } catch {}
+  return out.toLowerCase();
+}
+
+/**
+ * The home folder and drive roots are never projects: in the home folder,
+ * .claude/settings.json is the user's global Claude Code config, and a
+ * CLAUDE.md there is read by every project below it.
+ */
+export function isUnsafeRoot(dir: string): boolean {
+  const c = canonical(dir);
+  return c === canonical(homedir()) || c === parse(resolve(dir)).root.toLowerCase() || c === parse(c).root;
+}
+
+/**
+ * Project root: nearest ancestor with .claude-board, else nearest with .git,
+ * else the start dir. The search stops at the home folder or a drive root, so
+ * a stray board there can never capture the projects below it.
+ */
 export function findRoot(start?: string): string {
-  const from = resolve(start ?? process.env.CLAUDE_BOARD_ROOT ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+  if (!start && process.env.CLAUDE_BOARD_ROOT) return resolve(process.env.CLAUDE_BOARD_ROOT);
+  const from = resolve(start ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
   let gitRoot: string | undefined;
-  let dir = from;
-  for (;;) {
+  for (let dir = from; !isUnsafeRoot(dir); ) {
     if (existsSync(join(dir, BOARD_DIR, 'state.json'))) return dir;
     if (!gitRoot && existsSync(join(dir, '.git'))) gitRoot = dir;
     const up = dirname(dir);

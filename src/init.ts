@@ -1,10 +1,12 @@
 // Zero-config drop-in: wires an existing repo to the board without touching
 // its code. Every file is merged, never overwritten, and re-running is safe.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { GuardMode } from './core/schema.js';
 import { Store } from './core/store.js';
+import { BOARD_DIR, isUnsafeRoot } from './paths.js';
 
 const SNIPPET_START = '<!-- claude-board:start -->';
 const SNIPPET_END = '<!-- claude-board:end -->';
@@ -52,7 +54,11 @@ function writeJson(file: string, data: unknown) {
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
 }
 
+export const UNSAFE_ROOT_MSG = (root: string) =>
+  `${root} is your home folder (or a drive root), not a project: .claude/settings.json there is your global Claude Code config and CLAUDE.md there is read by every project. cd into a project folder and run init again.`;
+
 export function init(root: string, opts: InitOptions = {}): string[] {
+  if (isUnsafeRoot(root)) throw new Error(UNSAFE_ROOT_MSG(root));
   const report: string[] = [];
   const store = new Store(root);
   const created = store.init(opts.name ?? basename(root), opts.goal);
@@ -122,4 +128,88 @@ export function init(root: string, opts: InitOptions = {}): string[] {
     }
   }
   return report;
+}
+
+const isEmpty = (o: unknown) => !!o && typeof o === 'object' && Object.keys(o as object).length === 0;
+
+/**
+ * Undoes init: drops only what init added (board server, our hooks, our allow
+ * rule, our default timeout, the CLAUDE.md snippet). Every touched file is
+ * copied to a backup folder first. The board state is kept unless `purge`.
+ */
+export function remove(root: string, opts: { purge?: boolean; backupDir?: string } = {}): { report: string[]; backup: string } {
+  const report: string[] = [];
+  if (opts.backupDir) mkdirSync(opts.backupDir, { recursive: true });
+  const backup = mkdtempSync(join(opts.backupDir ?? tmpdir(), 'claude-board-backup-'));
+  const save = (file: string, name: string) => existsSync(file) && copyFileSync(file, join(backup, name));
+
+  const mcpFile = join(root, '.mcp.json');
+  if (existsSync(mcpFile)) {
+    const mcp = readJson(mcpFile);
+    if (mcp.mcpServers?.board) {
+      save(mcpFile, 'mcp.json');
+      delete mcp.mcpServers.board;
+      if (isEmpty(mcp.mcpServers)) delete mcp.mcpServers;
+      if (isEmpty(mcp)) rmSync(mcpFile);
+      else writeJson(mcpFile, mcp);
+      report.push('- .mcp.json: server "board"');
+    }
+  }
+
+  const settingsFile = join(root, '.claude', 'settings.json');
+  if (existsSync(settingsFile)) {
+    save(settingsFile, 'settings.json');
+    const s = readJson(settingsFile);
+    let touched = false;
+    for (const [event, groups] of Object.entries<any[]>(s.hooks ?? {})) {
+      const kept = groups.filter((g) => !(g.hooks ?? []).some((h: any) => HOOK_MARK.test(h.command ?? '') && / hook (session-start|prompt|guard)$/.test(h.command ?? '')));
+      if (kept.length !== groups.length) touched = true;
+      if (kept.length) s.hooks[event] = kept;
+      else delete s.hooks[event];
+    }
+    if (isEmpty(s.hooks)) delete s.hooks;
+    const drop = (list: unknown, value: string) => (Array.isArray(list) ? list.filter((x) => x !== value) : list);
+    if (s.enabledMcpjsonServers?.includes('board')) {
+      s.enabledMcpjsonServers = drop(s.enabledMcpjsonServers, 'board');
+      if (!s.enabledMcpjsonServers.length) delete s.enabledMcpjsonServers;
+      touched = true;
+    }
+    if (s.permissions?.allow?.includes(BOARD_TOOLS)) {
+      s.permissions.allow = drop(s.permissions.allow, BOARD_TOOLS);
+      if (!s.permissions.allow.length) delete s.permissions.allow;
+      if (isEmpty(s.permissions)) delete s.permissions;
+      touched = true;
+    }
+    if (s.env?.MCP_TOOL_TIMEOUT === MCP_TIMEOUT_MS) {
+      delete s.env.MCP_TOOL_TIMEOUT;
+      if (isEmpty(s.env)) delete s.env;
+      touched = true;
+    }
+    if (touched) {
+      if (isEmpty(s)) rmSync(settingsFile);
+      else writeJson(settingsFile, s);
+      report.push('- .claude/settings.json: board hooks, allow rule, default timeout');
+    }
+  }
+
+  const md = join(root, 'CLAUDE.md');
+  if (existsSync(md)) {
+    const cur = readFileSync(md, 'utf8');
+    if (cur.includes(SNIPPET_START)) {
+      save(md, 'CLAUDE.md');
+      const next = cur.replace(new RegExp(`\\n*${SNIPPET_START}[\\s\\S]*?${SNIPPET_END}\\n?`), '\n').replace(/^\n+/, '');
+      if (next.trim()) writeFileSync(md, next.replace(/\n*$/, '\n'));
+      else rmSync(md);
+      report.push('- CLAUDE.md: board snippet');
+    }
+  }
+
+  const boardDir = join(root, BOARD_DIR);
+  if (opts.purge && existsSync(boardDir)) {
+    rmSync(boardDir, { recursive: true, force: true });
+    report.push(`- ${BOARD_DIR}/ (purged)`);
+  } else if (existsSync(boardDir)) {
+    report.push(`= ${BOARD_DIR}/ kept (use --purge to delete the board too)`);
+  }
+  return { report, backup };
 }

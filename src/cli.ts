@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Entry point. Subcommands load their modules lazily so hooks stay fast.
 import { Command, Option } from 'commander';
-import { findRoot } from './paths.js';
+import { findRoot, isUnsafeRoot } from './paths.js';
 import { VERSION } from './version.js';
 
 const program = new Command('claude-fun')
@@ -16,8 +16,9 @@ program
   .addOption(portOpt())
   .option('--no-open', 'do not open the browser')
   .action(async (o: { port?: number; open: boolean }) => {
-    const { startBoard } = await import('./server/http.js');
     const root = findRoot();
+    if (isUnsafeRoot(root)) throw new Error(`${root} is not a project folder; cd into a project first.`);
+    const { startBoard } = await import('./server/http.js');
     const board = await startBoard(root, { port: o.port, log: console.log });
     if (!board.hosted) console.log(`board already running at ${board.url}`);
     if (o.open) (await import('open')).default(board.url).catch(() => {});
@@ -45,13 +46,30 @@ program
   });
 
 program
+  .command('remove')
+  .description('undo init in this repo (board server, hooks, CLAUDE.md snippet); backs files up first')
+  .option('--purge', 'also delete .claude-board/ (the plan and its history)')
+  .option('--backup <dir>', 'where to put the backup (default: system temp)')
+  .action(async (o: { purge?: boolean; backup?: string }) => {
+    const { remove } = await import('./init.js');
+    const root = findRoot();
+    const { report, backup } = remove(root, { purge: o.purge, backupDir: o.backup });
+    console.log(report.length ? `Claude Board removed from ${root}\n${report.join('\n')}\nbackup: ${backup}` : `nothing to remove in ${root}`);
+  });
+
+program
   .command('mcp')
   .description('stdio MCP server for Claude Code (also hosts the board UI)')
   .addOption(portOpt())
   .option('--no-ui', 'do not host the board UI')
   .action(async (o: { port?: number; ui: boolean }) => {
+    const root = findRoot();
+    if (isUnsafeRoot(root)) {
+      process.stderr.write(`[claude-board] ${root} is not a project folder; open Claude Code inside a project.\n`);
+      process.exit(1);
+    }
     const { runMcp } = await import('./mcp/server.js');
-    await runMcp(findRoot(), { ui: o.ui, port: o.port });
+    await runMcp(root, { ui: o.ui, port: o.port });
   });
 
 program

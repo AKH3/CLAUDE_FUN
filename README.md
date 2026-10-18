@@ -41,7 +41,7 @@ claude-fun init
 claude
 ```
 
-يجهّز `init` المشروع، ثم يشغّل Claude Code خادم MCP تلقائياً ومعه اللوحة على `http://localhost:3000`. يعرض كلاود الرابط عند أول `resume`، ويمكنك فتح اللوحة يدوياً متى شئت بالأمر `claude-fun`.
+شغّل `init` **داخل مجلد المشروع** وليس في مجلد المستخدم؛ الأداة ترفض مجلد المستخدم وجذر القرص لأن `.claude/settings.json` هناك هو إعدادات Claude Code العامة. يجهّز `init` المشروع، ثم يشغّل Claude Code خادم MCP تلقائياً ومعه اللوحة على `http://localhost:3000`. يعرض كلاود الرابط عند أول `resume`، ويمكنك فتح اللوحة يدوياً متى شئت بالأمر `claude-fun`.
 
 لتجربة اللوحة بدون مشروع:
 
@@ -107,6 +107,7 @@ board http://localhost:3000
 |---|---|
 | `claude-fun` | يشغّل اللوحة للمشروع الحالي ويفتح المتصفح. |
 | `claude-fun init` | يجهّز المستودع. |
+| `claude-fun remove` | يلغي ما أضافه `init` بعد أخذ نسخة احتياطية. `--purge` يحذف اللوحة أيضاً، و `--backup <dir>` يحدد مكان النسخة. |
 | `claude-fun status` | يطبع ملخص الاستئناف في الطرفية. |
 | `claude-fun mcp` | خادم MCP عبر stdio. يستدعيه Claude Code بنفسه. |
 | `claude-fun hook <name>` | معالجات الهوكس: `session-start` و `prompt` و `guard`. |
@@ -177,7 +178,7 @@ claude-fun init
 claude
 ```
 
-Claude Code launches the `board` MCP server, which also hosts the board at `http://localhost:3000`. To try it without a project, run `claude-fun demo --simulate`. Requires Node.js 22+, plus git for diffs.
+Run `init` inside a project folder: it refuses your home folder and drive roots, because `.claude/settings.json` there is your global Claude Code config. `claude-fun remove` undoes `init` (backing files up first; `--purge` also deletes the board). Claude Code launches the `board` MCP server, which also hosts the board at `http://localhost:3000`. To try it without a project, run `claude-fun demo --simulate`. Requires Node.js 22+, plus git for diffs.
 
 **Windows PowerShell:** an `UnauthorizedAccess` error comes from PowerShell's script execution policy, not from this tool. Use `npm.cmd` and `claude-fun.cmd`, or allow signed scripts for your account with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (your call, since it is a security setting).
 

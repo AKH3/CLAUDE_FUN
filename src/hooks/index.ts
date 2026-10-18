@@ -5,7 +5,7 @@ import { fmtDirectives, leaves, takeUnread, unread } from '../core/ops.js';
 import type { State } from '../core/schema.js';
 import { Store } from '../core/store.js';
 import { summary } from '../core/summary.js';
-import { BOARD_DIR, findRoot } from '../paths.js';
+import { BOARD_DIR, findRoot, isUnsafeRoot } from '../paths.js';
 
 interface HookInput {
   session_id?: string;
@@ -112,6 +112,7 @@ export function guardDecision(state: State, root: string, input: Pick<HookInput,
 export async function runHook(name: string) {
   const input = await readStdin();
   const root = findRoot(input.cwd || undefined);
+  if (isUnsafeRoot(root)) return; // never act on a board in the home folder or a drive root
   const store = new Store(root);
   if (!store.exists()) return;
 
