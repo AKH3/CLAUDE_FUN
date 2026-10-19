@@ -136,6 +136,7 @@ board http://localhost:3000
 - **مسار فيه مسافات** مثل `D:\Program Files x86`: يكتب `init` المسار بشرطات أمامية وبين علامتي تنصيص، فيعمل في bash وفي cmd.
 - **المنفذ 3000 مشغول:** المحرك يجرّب المنافذ التالية تلقائياً، ويكتب المنفذ المستخدم في `.claude-board/.runtime.json`. يقرأ `claude-fun` هذا الملف أولاً ويتأكد أن اللوحة تردّ فعلاً، فيفتح نفس اللوحة بدل تشغيل نسخة ثانية.
 - **نقلت الأداة إلى مكان آخر:** أعد تشغيل `claude-fun init`، لأن الهوكس تشير إلى المسار المطلق للأداة.
+- **بطاقة باقية «قيد التنفيذ» بعد انتهاء العمل:** اللوحة تعرض ما يبلّغ عنه كلاود فقط، فإذا انتهت الجلسة قبل أن يبلّغ بقيت الخطوة معلّقة. عند بداية كل جلسة جديدة ينبّه المحرك كلاود (في هوك `SessionStart` وفي أول `resume`) إلى الخطوات المعلّقة، فيتحقق منها ثم يعلّمها منجزة أو فاشلة.
 
 ## التطوير
 
@@ -175,6 +176,7 @@ Long progress narration burns tokens and buries the plan in terminal scrollback.
 - The UI is prebuilt, so Claude never generates UI or prose for status.
 - Claude reports deltas such as `{"id":"S2.1","s":"done","n":"db wired","t":"pass"}`, about 15–25 tokens each.
 - A resume summary under 100 tokens replaces re-reading old chats.
+- Steps an earlier session left in "run" are flagged as `stale` when a new session starts, so Claude verifies them and reports done or fail instead of leaving them hanging.
 - Steps only run after you approve them on the board. The engine enforces this, so it doesn't depend on the prompt.
 
 ### Quick start

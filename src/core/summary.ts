@@ -15,7 +15,21 @@ export function nextStep(s: State): Step | undefined {
   return queued[0] ?? ready[0];
 }
 
-export function summary(s: State, opts: { usage?: Usage; msgs?: Directive[]; url?: string } = {}): string {
+/**
+ * Steps still "run" when a session starts were left by an earlier session that
+ * ended before reporting them (the board only knows what Claude reports).
+ */
+function staleLines(running: Step[]): string[] {
+  const lines = [`stale ${running.length} step(s) still "run" from an earlier session: verify each (diff, tests), then update done or fail`];
+  for (const st of running.slice(0, 4)) lines.push(` ${st.id} ${title(st)}${st.n ? ` n:${JSON.stringify(st.n)}` : ''}`);
+  if (running.length > 4) lines.push(` +${running.length - 4} more`);
+  return lines;
+}
+
+export function summary(
+  s: State,
+  opts: { usage?: Usage; msgs?: Directive[]; url?: string; stale?: boolean } = {},
+): string {
   const ls = leaves(s).filter((x) => x.s !== 'skip');
   if (!s.phases.length) {
     const lines = [`${s.project.name} r${s.rev} | empty board -> call plan`];
@@ -36,7 +50,8 @@ export function summary(s: State, opts: { usage?: Usage; msgs?: Directive[]; url
   const lines = [head];
 
   const running = ls.filter((x) => x.s === 'run');
-  for (const st of running.slice(0, 2)) lines.push(`now ${st.id} ${title(st)}`);
+  if (opts.stale && running.length) lines.push(...staleLines(running));
+  else for (const st of running.slice(0, 2)) lines.push(`now ${st.id} ${title(st)}`);
 
   const next = nextStep(s);
   if (next && !running.length) lines.push(`next ${next.id} ${title(next)}`);

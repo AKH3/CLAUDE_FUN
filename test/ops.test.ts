@@ -116,6 +116,26 @@ describe('summary', () => {
     expect(text).toContain('tok 51k/250k');
     expect(text).toContain('msg ok P1; S1.2 note:"prefer small files"');
   });
+
+  it('flags steps an earlier session left running when a session starts', () => {
+    const s = planned();
+    applyAction(s, { type: 'approveMany', ids: ['S1.1', 'S2.1'] });
+    applyDeltas(s, [{ id: 'S1.1', s: 'run', n: 'tested, awaiting suite' }, { id: 'S2.1', s: 'run' }]);
+
+    const start = summary(s, { stale: true });
+    expect(start).toContain('stale 2 step(s) still "run" from an earlier session');
+    expect(start).toContain(' S1.1 "Init repo" n:"tested, awaiting suite"');
+    expect(start).toContain(' S2.1 "Hono server"');
+    expect(start).not.toContain('now ');
+
+    // mid-session the same steps are just the current work
+    const mid = summary(s);
+    expect(mid).toContain('now S1.1');
+    expect(mid).not.toContain('stale');
+
+    applyDeltas(s, [{ id: 'S1.1', s: 'done' }, { id: 'S2.1', s: 'done' }]);
+    expect(summary(s, { stale: true })).not.toContain('stale');
+  });
 });
 
 describe('effort', () => {

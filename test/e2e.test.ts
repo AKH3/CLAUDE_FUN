@@ -83,6 +83,14 @@ describe('claude <-> board loop', () => {
     expect(w.text).toContain('msg ok S1.1');
 
     expect((await call('update', { ops: [{ id: 'S1.1', s: 'run' }] })).text).toMatch(/^ok r\d+$/);
+    // mid-session resume shows the running step as current work...
+    const mid = await call('resume');
+    expect(mid.text).toContain('now S1.1');
+    expect(mid.text).not.toContain('stale');
+    // ...while a new session sees it as left over from the last one
+    const fresh = hook('session-start', { cwd: t.dir });
+    expect(fresh.hookSpecificOutput.additionalContext).toContain('stale 1 step(s) still "run"');
+    expect(fresh.hookSpecificOutput.additionalContext).toContain(' S1.1 "Edit app"');
     expect(hook('guard', { cwd: t.dir, tool_name: 'Edit', tool_input: { file_path: join(t.dir, 'app.ts') } })).toBeUndefined();
 
     writeFileSync(join(t.dir, 'app.ts'), 'export const a = 2;\nexport const b = 3;\n');

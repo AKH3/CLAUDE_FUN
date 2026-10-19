@@ -36,6 +36,9 @@ export async function runMcp(root: string, opts: { ui?: boolean; port?: number }
   const boardUrl = () => board?.url ?? store.readRuntime()?.url;
 
   const server = new McpServer({ name: 'claude-board', version: VERSION }, { instructions: INSTRUCTIONS });
+  // Claude Code starts one server per session, so the first resume opens a session:
+  // any step still "run" then was left by an earlier one.
+  let firstResume = true;
 
   server.registerTool(
     'resume',
@@ -45,7 +48,9 @@ export async function runMcp(root: string, opts: { ui?: boolean; port?: number }
       const { state, result: msgs } = pending
         ? store.mutate((s) => takeUnread(s))
         : { state: store.read(), result: [] };
-      return text(summary(state, { usage: store.readUsage(), msgs, url: boardUrl() }));
+      const stale = firstResume;
+      firstResume = false;
+      return text(summary(state, { usage: store.readUsage(), msgs, url: boardUrl(), stale }));
     },
   );
 

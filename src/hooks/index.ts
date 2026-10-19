@@ -122,7 +122,7 @@ export async function runHook(name: string) {
       const pending = unread(store.read()).length > 0;
       const { state, result: msgs } = pending ? store.mutate((s) => takeUnread(s)) : { state: store.read(), result: [] };
       emit('SessionStart', {
-        additionalContext: `Claude Board (mcp "board") is active.\n${summary(state, { usage: store.readUsage(), msgs, url: store.readRuntime()?.url })}`,
+        additionalContext: `Claude Board (mcp "board") is active.\n${summary(state, { usage: store.readUsage(), msgs, url: store.readRuntime()?.url, stale: true })}`,
       });
       return;
     }
