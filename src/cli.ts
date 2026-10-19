@@ -21,7 +21,8 @@ program
     const { startBoard } = await import('./server/http.js');
     const board = await startBoard(root, { port: o.port, log: console.log });
     if (!board.hosted) console.log(`board already running at ${board.url}`);
-    if (o.open) (await import('open')).default(board.url).catch(() => {});
+    // wait for the browser to launch: exiting first kills the launcher before it starts
+    if (o.open) await (await import('open')).default(board.url).catch(() => {});
     if (!board.hosted) process.exit(0);
     console.log(`project ${root}\nctrl+c to stop`);
     process.on('SIGINT', async () => {
