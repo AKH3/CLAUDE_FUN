@@ -192,8 +192,20 @@ async function pingRoot(port: number): Promise<string | undefined> {
   }
 }
 
+const sameRoot = (a: string, b: string) => normalize(a).toLowerCase() === normalize(b).toLowerCase();
+
+const existing = (port: number): BoardServer => ({ url: `http://localhost:${port}`, port, hosted: false, close: async () => {} });
+
 /** Starts (or finds an existing) board server for this project. */
 export async function startBoard(root: string, opts: BoardOptions = {}): Promise<BoardServer> {
+  // The live board may sit on any port (e.g. `mcp --port 3014`), so try the one
+  // it recorded first. Only a ping proves it: a hard kill leaves a stale file.
+  const live = new Store(root).readRuntime()?.port;
+  if (live) {
+    const other = await pingRoot(live);
+    if (other && sameRoot(other, root)) return existing(live);
+  }
+
   const first = opts.port ?? 3000;
   const { app, store, close } = createApp(root, opts);
   for (let port = first; port < first + 25; port++) {
@@ -215,9 +227,9 @@ export async function startBoard(root: string, opts: BoardOptions = {}): Promise
     } catch (e: any) {
       if (e?.code !== 'EADDRINUSE') throw e;
       const other = await pingRoot(port);
-      if (other && normalize(other).toLowerCase() === normalize(root).toLowerCase()) {
+      if (other && sameRoot(other, root)) {
         await close();
-        return { url: `http://localhost:${port}`, port, hosted: false, close: async () => {} };
+        return existing(port);
       }
     }
   }

@@ -5,7 +5,7 @@ description: Installs Claude Board (CLAUDE_FUN, the `claude-fun` CLI from github
 
 # Claude Board setup
 
-Claude Board is a local visual board for Claude Code. Claude reports progress through four MCP tools (`resume`, `plan`, `update`, `await`) on a server named `board`, and the user approves each step in a browser page on `http://localhost:3000`. Your job is to get it installed and working in the user's project with as little effort from them as possible.
+Claude Board is a local visual board for Claude Code. Claude reports progress through four MCP tools (`resume`, `plan`, `update`, `await`) on a server named `board`, and the user approves each step in a browser page, usually `http://localhost:3000` (the port can differ: the next free one if 3000 is busy, or whatever `--port` sets). Your job is to get it installed and working in the user's project with as little effort from them as possible.
 
 Reply in the user's language (Arabic if they write Arabic), keep technical names in English, and run every command yourself. Only stop and ask when a step below says so.
 
@@ -123,7 +123,7 @@ Claude Code only loads a new MCP server when a session starts, so the board won'
 
 1. Start a new Claude Code session in `<project>`: in the desktop app, a new session with that folder; in a terminal, `cd` into it and run `claude`.
 2. Approve the `board` MCP server (and trust the folder) when Claude Code asks. In a terminal session, `/mcp` should then list `board` as connected.
-3. Open `http://localhost:3000`, or run `claude-fun.cmd` in that folder to open it. If port 3000 is busy the board takes the next free port, and Claude gives the right link in its first reply.
+3. Run `claude-fun.cmd` in that folder: it opens whichever board is already running for the project, on any port (0.3.2+). Or open the link Claude gives in its first reply; it is usually `http://localhost:3000`, but the board takes the next free port if 3000 is busy.
 4. Ask Claude for a plan, for example «خطط لبناء …». Steps show up on the board and wait for ✓ «اعتماد البدء».
 5. To try the board without a project first: `claude-fun.cmd demo --simulate`.
 

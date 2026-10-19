@@ -45,7 +45,7 @@ claude-fun init
 claude
 ```
 
-شغّل `init` **داخل مجلد المشروع** وليس في مجلد المستخدم؛ الأداة ترفض مجلد المستخدم وجذر القرص لأن `.claude/settings.json` هناك هو إعدادات Claude Code العامة. يجهّز `init` المشروع، ثم يشغّل Claude Code خادم MCP تلقائياً ومعه اللوحة على `http://localhost:3000`. يعرض كلاود الرابط عند أول `resume`، ويمكنك فتح اللوحة يدوياً متى شئت بالأمر `claude-fun`.
+شغّل `init` **داخل مجلد المشروع** وليس في مجلد المستخدم؛ الأداة ترفض مجلد المستخدم وجذر القرص لأن `.claude/settings.json` هناك هو إعدادات Claude Code العامة. يجهّز `init` المشروع، ثم يشغّل Claude Code خادم MCP تلقائياً ومعه اللوحة، وتكون عادةً على `http://localhost:3000`. قد يختلف المنفذ إذا كان 3000 مشغولاً أو إذا ضبطته بـ `--port`، فيعرض كلاود الرابط الصحيح عند أول `resume`. ويمكنك فتح اللوحة يدوياً متى شئت بالأمر `claude-fun`، وهو يفتح اللوحة الشغّالة للمشروع أياً كان منفذها ولا يشغّل لوحة ثانية.
 
 لتجربة اللوحة بدون مشروع:
 
@@ -116,7 +116,7 @@ board http://localhost:3000
 
 | الأمر | الوظيفة |
 |---|---|
-| `claude-fun` | يشغّل اللوحة للمشروع الحالي ويفتح المتصفح. |
+| `claude-fun` | يفتح لوحة المشروع الحالي في المتصفح: يستخدم اللوحة الشغّالة أياً كان منفذها، ويشغّل واحدة إذا لم تكن هناك لوحة. |
 | `claude-fun init` | يجهّز المستودع. |
 | `claude-fun remove` | يلغي ما أضافه `init` بعد أخذ نسخة احتياطية. `--purge` يحذف اللوحة أيضاً، و `--backup <dir>` يحدد مكان النسخة. |
 | `claude-fun status` | يطبع ملخص الاستئناف في الطرفية. |
@@ -134,7 +134,7 @@ board http://localhost:3000
 
 - **ينتهي `await` قبل أن تعتمد:** ينتظر `await` حتى 300 ثانية ثم يعود، ويرسل المحرك إشعارات تقدّم كل 15 ثانية. يضبط `init` المتغير `MCP_TOOL_TIMEOUT` على 10 دقائق، ويمكنك رفعه في `.claude/settings.json`.
 - **مسار فيه مسافات** مثل `D:\Program Files x86`: يكتب `init` المسار بشرطات أمامية وبين علامتي تنصيص، فيعمل في bash وفي cmd.
-- **المنفذ 3000 مشغول:** المحرك يجرّب المنافذ التالية تلقائياً، ويكتب المنفذ المستخدم في `.claude-board/.runtime.json`.
+- **المنفذ 3000 مشغول:** المحرك يجرّب المنافذ التالية تلقائياً، ويكتب المنفذ المستخدم في `.claude-board/.runtime.json`. يقرأ `claude-fun` هذا الملف أولاً ويتأكد أن اللوحة تردّ فعلاً، فيفتح نفس اللوحة بدل تشغيل نسخة ثانية.
 - **نقلت الأداة إلى مكان آخر:** أعد تشغيل `claude-fun init`، لأن الهوكس تشير إلى المسار المطلق للأداة.
 
 ## التطوير
@@ -189,7 +189,7 @@ claude-fun init
 claude
 ```
 
-Run `init` inside a project folder: it refuses your home folder and drive roots, because `.claude/settings.json` there is your global Claude Code config. `claude-fun remove` undoes `init` (backing files up first; `--purge` also deletes the board). Claude Code launches the `board` MCP server, which also hosts the board at `http://localhost:3000`. To try it without a project, run `claude-fun demo --simulate`. Requires Node.js 22+, plus git for diffs.
+Run `init` inside a project folder: it refuses your home folder and drive roots, because `.claude/settings.json` there is your global Claude Code config. `claude-fun remove` undoes `init` (backing files up first; `--purge` also deletes the board). Claude Code launches the `board` MCP server, which also hosts the board, usually at `http://localhost:3000` (the port can differ: the next free one if 3000 is busy, or whatever `--port` sets). `claude-fun` opens whichever board is already running for the project, on any port, and starts one only if none is. To try it without a project, run `claude-fun demo --simulate`. Requires Node.js 22+, plus git for diffs.
 
 **Windows PowerShell:** an `UnauthorizedAccess` error comes from PowerShell's script execution policy, not from this tool. Use `npm.cmd` and `claude-fun.cmd`, or allow signed scripts for your account with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (your call, since it is a security setting).
 
