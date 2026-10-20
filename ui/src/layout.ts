@@ -2,7 +2,7 @@
 // steps stacked under their phase, substeps indented, deps as cross links.
 import type { Edge, Node } from '@xyflow/react';
 import type { Phase, State, Step, Usage } from '../../src/core/schema';
-import { childrenOf, depsMet, descendants, hasChildren, phaseComplete, phasesSorted } from '../../src/core/tree';
+import { childrenOf, depsMet, descendants, hasChildren, phaseComplete, phasesSorted, runLine } from '../../src/core/tree';
 
 export const COL_W = 312;
 export const PHASE_W = 268;
@@ -18,6 +18,8 @@ export interface StepData extends Record<string, unknown> {
   step: Step;
   depth: number;
   locked: boolean;
+  /** Place in the user's start order (1 = next), if it is in line. */
+  place?: number;
   container: boolean;
   kids: number;
   kidsDone: number;
@@ -59,6 +61,7 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean, isColla
   const n = phases.length;
   const stepTokens = (st: Step) => leafOf(s, st).reduce((a, x) => a + (usage?.steps[x.id] ?? 0), 0);
   const isRunning = (st: Step) => st.s === 'run';
+  const place = new Map(runLine(s).map((x, i) => [x.id, i + 1]));
 
   phases.forEach((ph, i) => {
     const x = (rtl ? n - 1 - i : i) * COL_W;
@@ -104,6 +107,7 @@ export function layout(s: State, usage: Usage | undefined, rtl: boolean, isColla
             step: st,
             depth,
             locked: (st.s === 'todo' || st.s === 'ok') && !depsMet(s, st),
+            place: place.get(st.id),
             container: kids.length > 0,
             kids: kids.length,
             kidsDone: kids.filter((k) => k.s === 'done').length,

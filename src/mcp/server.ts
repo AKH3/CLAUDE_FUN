@@ -15,7 +15,7 @@ export const INSTRUCTIONS = `Claude Board: the user follows progress on a live v
 1. Call resume first.
 2. New work: plan phases/steps as {t,e,a}: t=short title; e=effort 1 small|2 medium|3 large; a=what it does + why it helps, <=20 words in the user's language (shown when they click "?"). Then end your turn: the board wakes you when the user approves.
 3. Before a step: update {id,s:"run"}. After it: {id,s:"done"|"fail",n:"<=8 words",t:"pass"|"fail"|"none"}.
-4. Only approved steps can run; the engine refuses others. Run steps in the order "next" gives; when none is left, end your turn.
+4. Only approved steps can run, one at a time, in the user's order ("next", then "then"); the engine refuses others. If you can't do the next one, update it {s:"block",n:"why"}. When none is left, end your turn.
 5. "msg" lines are the user's clicks on the board: ok=approved ("ok A,B in order"=run them back to back), note=follow it (no step id = the user writing to you), prio=reorder, split=call plan with parent, ask=answer with update {id,a:"<=25 words: what the step does + expected benefit, in the user's language"} then carry on.`;
 
 const TAKEOVER_MS = 5000;

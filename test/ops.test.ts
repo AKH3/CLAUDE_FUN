@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, applyDeltas, applyPlan, emptyState, findStep, ordered, takeUnread, fmtDirectives } from '../src/core/ops.js';
+import { applyAction, applyDeltas, applyPlan, emptyState, findStep, ordered, runLine, takeUnread, fmtDirectives } from '../src/core/ops.js';
 import { afterUpdate, nextStep, summary } from '../src/core/summary.js';
 
 function planned() {
@@ -120,7 +120,9 @@ describe('summary', () => {
   it('flags steps an earlier session left running when a session starts', () => {
     const s = planned();
     applyAction(s, { type: 'approveMany', ids: ['S1.1', 'S2.1'] });
-    applyDeltas(s, [{ id: 'S1.1', s: 'run', n: 'tested, awaiting suite' }, { id: 'S2.1', s: 'run' }]);
+    applyDeltas(s, [{ id: 'S1.1', s: 'run', n: 'tested, awaiting suite' }]);
+    // the engine runs one step at a time now, but boards from older versions can hold two
+    findStep(s, 'S2.1')!.s = 'run';
 
     const start = summary(s, { stale: true });
     expect(start).toContain('stale 2 step(s) still "run" from an earlier session');
@@ -186,11 +188,11 @@ describe('batch start', () => {
     expect(nextStep(s)!.id).toBe('S2.1');
   });
 
-  it('queues a later batch after an earlier one and skips steps it cannot start', () => {
+  it('puts a later batch in front of an earlier one and skips steps it cannot start', () => {
     const s = planned();
     applyAction(s, { type: 'approveMany', ids: ['S2.2'] });
     applyAction(s, { type: 'approveMany', ids: ['S2.1', 'S1.1'] });
-    expect(['S2.2', 'S2.1', 'S1.1'].map((id) => findStep(s, id)!.q)).toEqual([1, 2, 3]);
+    expect(runLine(s).map((x) => x.id)).toEqual(['S2.1', 'S1.1', 'S2.2']);
     expect(fmtDirectives(takeUnread(s))).toBe('ok S2.2; ok S2.1,S1.1 in order');
     applyAction(s, { type: 'reject', id: 'S2.3' });
     expect(() => applyAction(s, { type: 'approveMany', ids: ['S2.3'] })).toThrow('nothing to start');

@@ -19,10 +19,12 @@ import {
   findStep,
   hasChildren,
   leaves,
+  nextStep,
   num,
   phaseComplete,
   phaseNum,
   phasesSorted,
+  runLine,
   unmetDeps,
 } from './tree.js';
 
@@ -166,6 +168,23 @@ export function rollup(s: State, before?: Map<string, boolean>) {
 export const phaseSnapshot = (s: State) =>
   new Map(s.phases.map((p) => [p.id, phaseComplete(s, p.id)]));
 
+// ---------- the run line ----------
+
+const leavesUnder = (s: State, st: Step) => (hasChildren(s, st.id) ? descendants(s, st.id).filter((x) => !hasChildren(s, x.id)) : [st]);
+
+/**
+ * Puts approved steps in the user's run line. "Start" joins the end, in the
+ * order the user pressed it; "Start in order" goes to the front, because the
+ * user just said what comes next. Steps already in line keep their place
+ * unless they are moved to the front.
+ */
+export function enqueue(s: State, list: Step[], where: 'front' | 'end') {
+  const fresh = list.filter((x) => x.s === 'ok' && !hasChildren(s, x.id) && (where === 'front' || x.q === undefined));
+  const rest = runLine(s).filter((x) => !fresh.includes(x));
+  const line = where === 'front' ? [...fresh, ...rest] : [...rest, ...fresh];
+  line.forEach((x, i) => (x.q = i + 1));
+}
+
 // ---------- Claude: plan ----------
 
 function addSteps(
@@ -225,9 +244,17 @@ export function applyPlan(s: State, a: PlanArgs): string {
     if (a.parent) {
       const parent = findStep(s, a.parent);
       if (!parent) throw new Error(`${a.parent} ?`);
-      // refining an approved step keeps its approval
+      // refining an approved step keeps its approval, and its substeps take its place in line
       const st: StepStatus = ['ok', 'run'].includes(parent.s) ? 'ok' : initial;
+      const line = runLine(s); // read before the parent stops being a leaf
       const ids = addSteps(s, parent.p, parent.id, a.steps, st, 'claude');
+      const kids = ids.map((id) => findStep(s, id)!);
+      const at = line.indexOf(parent);
+      if (at >= 0) {
+        line.splice(at, 1, ...kids);
+        line.forEach((x, i) => (x.q = i + 1));
+      } else if (parent.s === 'run') enqueue(s, kids, 'front'); // it was being worked on
+      parent.q = undefined;
       out.push(`${parent.id}> ${span(ids)}`);
     } else {
       const phaseId = a.phase ?? phasesSorted(s).at(-1)?.id;
@@ -294,6 +321,13 @@ function transition(s: State, st: Step, to: StepStatus, git: GitCtx): string | u
     const waiting = unmetDeps(s, st);
     if (waiting.length) return `${st.id} blocked by ${waiting.join(',')}`;
     if (st.s !== 'run') {
+      // one step at a time, in the order the user set on the board
+      const busy = leaves(s).find((x) => x.s === 'run');
+      if (busy) return `${st.id} waits: ${busy.id} is still running; report it done or fail first`;
+      const next = st.s === 'ok' ? nextStep(s) : undefined;
+      if (next && next.id !== st.id && next.q !== undefined) return `${st.id} is not next: the user's order runs ${next.id} first`;
+    }
+    if (st.s !== 'run') {
       if (st.s === 'ok' || !st.base) st.base = git.tree;
       st.at = { run: now() };
     }
@@ -336,28 +370,40 @@ function action(s: State, a: Action): string {
       if (findPhase(s, a.id)) return action(s, { type: 'approvePhase', id: a.id });
       const st = need(s, a.id);
       for (const x of [st, ...descendants(s, st.id)]) if (x.s === 'todo' || x.s === 'block') x.s = 'ok';
+      enqueue(s, leavesUnder(s, st), 'end');
       directive(s, 'ok', st.id);
       return `approved ${st.id}`;
     }
     case 'approvePhase': {
       if (!findPhase(s, a.id)) throw new Error(`${a.id} not found`);
+      const approved = leaves(s).filter((x) => x.p === a.id && x.s === 'todo');
       for (const x of s.steps) if (x.p === a.id && x.s === 'todo') x.s = 'ok';
+      enqueue(s, approved, 'end');
       directive(s, 'ok', a.id);
       return `approved ${a.id}`;
     }
     case 'approveMany': {
-      // Start several steps in the order the user picked them: they get queue
-      // positions after any earlier batch, and Claude hears one directive.
+      // Start several steps in the order the user picked them, before anything
+      // else in line, and Claude hears one directive.
       const picked = [...new Set(a.ids)].map((id) => need(s, id)).filter((x) => !FINISHED.includes(x.s) && x.s !== 'run');
       if (!picked.length) throw new Error('nothing to start');
-      let q = Math.max(0, ...s.steps.map((x) => x.q ?? 0));
-      for (const st of picked) {
-        for (const x of [st, ...descendants(s, st.id)]) if (x.s === 'todo' || x.s === 'block') x.s = 'ok';
-        for (const x of hasChildren(s, st.id) ? descendants(s, st.id).filter((d) => !hasChildren(s, d.id)) : [st]) x.q = ++q;
-      }
+      for (const st of picked) for (const x of [st, ...descendants(s, st.id)]) if (x.s === 'todo' || x.s === 'block') x.s = 'ok';
+      enqueue(s, picked.flatMap((st) => leavesUnder(s, st)), 'front');
       const ids = picked.map((x) => x.id);
       directive(s, 'ok', ids[0], ids.length > 1 ? ids.join(',') : undefined);
       return `approved ${ids.join(' > ')}`;
+    }
+    case 'hold': {
+      // take back an approval that hasn't started: out of line, waiting again
+      const st = need(s, a.id);
+      const back = [st, ...descendants(s, st.id)].filter((x) => x.s === 'ok');
+      if (!back.length) throw new Error(`${st.id} is not waiting to start`);
+      for (const x of back) {
+        x.s = 'todo';
+        x.q = undefined;
+      }
+      enqueue(s, [], 'end'); // close the gap in the line
+      return `on hold ${st.id}`;
     }
     case 'ask': {
       const st = need(s, a.id);
@@ -430,7 +476,11 @@ function action(s: State, a: Action): string {
     }
     case 'reject': {
       const st = need(s, a.id);
-      for (const x of [st, ...descendants(s, st.id)]) if (x.s !== 'done') x.s = 'skip';
+      for (const x of [st, ...descendants(s, st.id)]) {
+        if (x.s !== 'done') x.s = 'skip';
+        x.q = undefined;
+      }
+      enqueue(s, [], 'end');
       directive(s, 'no', st.id);
       return `rejected ${st.id}`;
     }
@@ -443,7 +493,9 @@ function action(s: State, a: Action): string {
         x.base = undefined;
         x.head = undefined;
         x.at = {};
+        x.q = undefined;
       }
+      enqueue(s, leavesUnder(s, st), 'end');
       directive(s, 'retry', st.id);
       return `retry ${st.id}`;
     }
@@ -457,6 +509,7 @@ function action(s: State, a: Action): string {
       const phaseId = parent?.p ?? a.phase ?? phasesSorted(s).at(-1)?.id;
       if (!phaseId || !findPhase(s, phaseId)) throw new Error('phase not found');
       const [id] = addSteps(s, phaseId, parent?.id ?? null, [{ t: a.t, d: a.d?.trim() || undefined }], a.ok === false ? 'todo' : 'ok', 'user');
+      enqueue(s, [findStep(s, id)!], 'end');
       directive(s, 'add', id, a.t);
       if (a.d?.trim()) directive(s, 'note', id, a.d.trim());
       return `added ${id}`;

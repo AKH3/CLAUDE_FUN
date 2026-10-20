@@ -16,9 +16,9 @@ const IDEAS: { label: Text; text: Text }[] = [
 
 // What each button on a card does, so nothing on the board needs a typed command.
 const BUTTONS: { icon: IconName; label: Text; does: Text }[] = [
-  { icon: 'play', label: { ar: 'ابدأ', en: 'Start' }, does: { ar: 'يبدأ كلاود هذي الخطوة', en: 'Claude starts this step' } },
+  { icon: 'play', label: { ar: 'ابدأ', en: 'Start' }, does: { ar: 'تدخل آخر الدور، وكلاود يبدأها بدورها', en: 'Joins the end of the line; Claude starts it in turn' } },
   { icon: 'help', label: { ar: '؟', en: '?' }, does: { ar: 'يشرح لك وش الخطوة وليش', en: 'Explains the step and why' } },
-  { icon: 'list', label: { ar: '#', en: '#' }, does: { ar: 'اختر عدة خطوات بالترتيب ثم «ابدأ بالترتيب»', en: 'Pick several steps in order, then "Start in order"' } },
+  { icon: 'list', label: { ar: '#', en: '#' }, does: { ar: 'اختر خطوات بالترتيب ثم «ابدأ بالترتيب»: تبدأ قبل غيرها', en: 'Pick steps in order, then "Start in order": they go first' } },
   { icon: 'info', label: { ar: 'اضغط البطاقة', en: 'Click a card' }, does: { ar: 'تقسيم، رفض، إعادة، ملاحظة، تعديلات', en: 'Split, reject, retry, note, changes' } },
 ];
 

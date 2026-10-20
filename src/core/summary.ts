@@ -1,5 +1,5 @@
 // The resume line Claude reads instead of chat history. Budget: < 100 tokens.
-import { depsMet, fmtDirectives, hasChildren, leaves, phasesSorted } from './ops.js';
+import { fmtDirectives, hasChildren, leaves, nextStep, phasesSorted, runLine } from './ops.js';
 import type { Directive, State, Step, Usage } from './schema.js';
 
 const title = (st: Step, max = 36) => JSON.stringify(st.t.length > max ? st.t.slice(0, max - 1) + '…' : st.t);
@@ -8,12 +8,7 @@ export const kfmt = (n: number) => (n >= 1_000_000 ? `${(n / 1e6).toFixed(1)}M` 
 
 export const usedTokens = (u?: Usage) => (u ? u.total.in + u.total.cw + u.total.out : 0);
 
-/** Next approved step whose deps are met: queued (batch-started) steps first, in queue order. */
-export function nextStep(s: State): Step | undefined {
-  const ready = leaves(s).filter((x) => x.s === 'ok' && depsMet(s, x));
-  const queued = ready.filter((x) => x.q !== undefined).sort((x, y) => x.q! - y.q!);
-  return queued[0] ?? ready[0];
-}
+export { nextStep };
 
 /**
  * Steps still "run" when a session starts were left by an earlier session that
@@ -55,6 +50,9 @@ export function summary(
 
   const next = nextStep(s);
   if (next && !running.length) lines.push(`next ${next.id} ${title(next)}`);
+  // the rest of the user's order, so Claude can run it back to back
+  const then = runLine(s).filter((x) => x.id !== next?.id);
+  if (then.length) lines.push(`then ${then.slice(0, 6).map((x) => x.id).join('>')}${then.length > 6 ? ` +${then.length - 6}` : ''}`);
 
   const waiting = ls.filter((x) => x.s === 'todo');
   if (waiting.length) {

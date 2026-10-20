@@ -57,6 +57,19 @@ export const leaves = (s: State) => ordered(s).filter((x) => !hasChildren(s, x.i
 
 export const FINISHED: StepStatus[] = ['done', 'skip'];
 
+/** The user's run order: approved steps with a place in line, first to last. */
+export function runLine(s: State): Step[] {
+  return leaves(s)
+    .filter((x) => x.s === 'ok' && x.q !== undefined)
+    .sort((a, b) => a.q! - b.q!);
+}
+
+/** Next approved step whose deps are met: the user's line first, then plan order. */
+export function nextStep(s: State): Step | undefined {
+  const ready = leaves(s).filter((x) => x.s === 'ok' && depsMet(s, x));
+  return runLine(s).find((x) => ready.includes(x)) ?? ready[0];
+}
+
 export function depsMet(s: State, st: Step): boolean {
   return st.deps.every((d) => {
     const dep = findStep(s, d);

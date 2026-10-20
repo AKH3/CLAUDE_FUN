@@ -54,7 +54,7 @@ interface BoardStore {
 }
 
 // board housekeeping that Claude doesn't need to act on
-const LOCAL: Action['type'][] = ['archive', 'unarchive', 'setCfg', 'setGuard', 'reorder', 'edit'];
+const LOCAL: Action['type'][] = ['archive', 'unarchive', 'setCfg', 'setGuard', 'reorder', 'edit', 'hold'];
 
 // anything not running can be picked: open ones to start, any of them to archive
 const PICKABLE = ['todo', 'ok', 'block', 'done', 'fail', 'skip'];

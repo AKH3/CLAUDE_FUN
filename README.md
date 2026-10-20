@@ -66,7 +66,7 @@ claude-fun demo --simulate
 | **شجرة المراحل** | كل مرحلة عمود (من اليمين لليسار بالعربية)، والخطوات تحتها، والمهام الفرعية متفرعة منها. العقد تضيء عند الإنجاز، والمرحلة المكتملة تتحول للذهبي. |
 | **اللوحة توقظ كلاود** | أي ضغطة تحتاج كلاود (ابدأ، سؤال، رسالة، تقسيم، إعادة) توصله خلال ثواني حتى لو كان واقف، بدون ما تكتب له في المحادثة. أعلى اللوحة يقول لك دائماً: «كلاود يشتغل» أو «كلاود جاهز» أو «كلاود مو مفتوح». وإذا ما قدر يوصل، يطلع شريط يقول لك وش تكتب بالضبط. |
 | **بوابات الإذن** | البطاقة بانتظار موافقتك تنبض، وفيها زر «ابدأ». يوجد أيضاً «ابدأ المرحلة كلها» على بطاقة المرحلة. التقسيم والرفض والإعادة داخل البطاقة (اضغط عليها). |
-| **بدء عدة مهام بالترتيب** | اضغط `#` على البطاقات بالترتيب الذي تريده فتترقّم 1 و2 و3، ثم «ابدأ بالترتيب». ينفّذها كلاود واحدة تلو الأخرى دون توقف، ويصله سطر واحد فقط. |
+| **ترتيب البدء** | كل خطوة توافق عليها تدخل دوراً يظهر على بطاقتها («التالي»، «الدور 2»…). «ابدأ» يضعها آخر الدور، و«ابدأ بالترتيب» (بعد اختيار البطاقات بـ `#`) يضعها أول الدور بالترتيب الذي اخترته. المحرك يرفض أي خطوة قبل دورها، وخطوتين في نفس الوقت، فلا يتخطى كلاود الترتيب. و«رجّعها للانتظار» يخرج خطوة من الدور. |
 | **وش هذي الخطوة؟ ❔** | زر `?` على كل بطاقة يعرض فوراً شرحاً قصيراً لما تفعله الخطوة وفائدتها، يكتبه كلاود مع الخطة نفسها (ويظهر أيضاً عند مرور الماوس). الخطوات القديمة بدون شرح: يُسأل كلاود عند الضغط، وتُحفظ الإجابة. |
 | **الجهد المتوقع** | يقدّر كلاود جهد كل خطوة (خفيف / متوسط / كبير) ويظهر كأعمدة صغيرة بجانب رقمها، برقم واحد فقط في الخطة. |
 | **طي المراحل** | اضغط على بطاقة المرحلة لتطوي خطواتها أو تعرضها. زر ⓘ يفتح تفاصيل المرحلة. |
@@ -203,7 +203,7 @@ Run `init` inside a project folder: it refuses your home folder and drive roots,
 - **Skill-tree canvas:** phases as columns (mirrored in Arabic), steps beneath them, substeps branching off, and deps drawn as links. Nodes light up as they finish, and completed phases turn gold.
 - **The board wakes Claude:** a click that needs Claude (Start, a question, a message, Split, Retry) reaches it within seconds even when it is idle, with no need to type in the chat. A background `watch` hook (`asyncRewake`) waits for the click and starts a new turn. The top bar always says whether Claude is working, ready, or not open, and when a click can't reach it, a banner says exactly what to type.
 - **Permission checkpoints:** a *Start* button on every waiting card, plus *Start the whole phase*. Split, Reject and Retry are inside the card.
-- **Start several in order:** tap `#` on cards in the order you want (they number 1, 2, 3), then *Start in order*. Claude runs them back to back, and receives a single line.
+- **Start order:** every approved step gets a place in line, shown on its card (*Next*, *Place 2*…). *Start* joins the end; *Start in order* (after picking cards with `#`) puts the picks at the front in the picked order. The engine refuses a step before its turn and a second step while one runs, so Claude can't skip or reorder. *Put back on hold* takes a step out of line.
 - **What is this step? (`?`):** a short explanation of what a step does and why, written by Claude with the plan, so it opens instantly (and shows on hover). Older steps without one ask Claude on click, and the answer is cached.
 - **Expected effort:** Claude rates each step small/medium/large (one digit in the plan), shown as bars next to its id.
 - **Collapsible phases:** click a phase card to fold or unfold its steps; ⓘ opens the phase details.

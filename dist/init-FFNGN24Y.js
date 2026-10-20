@@ -1,5 +1,5 @@
 import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);
-import{b as $}from"./chunk-2WCZUPJD.js";import{a as v,c as D}from"./chunk-IYN2ZDVK.js";import"./chunk-FI2M5HXY.js";import"./chunk-UWIXOVFK.js";import{copyFileSync as I,existsSync as u,mkdirSync as R,mkdtempSync as N,readFileSync as C,rmSync as O,writeFileSync as y}from"fs";import{tmpdir as F}from"os";import{basename as W,dirname as L,join as c}from"path";import{fileURLToPath as H}from"url";var S="<!-- claude-board:start -->",U="<!-- claude-board:end -->",P=`${S}
+import{b as $}from"./chunk-BIFYUI6W.js";import{a as v,c as D}from"./chunk-IYN2ZDVK.js";import"./chunk-7RN76XTP.js";import"./chunk-UWIXOVFK.js";import{copyFileSync as I,existsSync as u,mkdirSync as R,mkdtempSync as N,readFileSync as C,rmSync as O,writeFileSync as y}from"fs";import{tmpdir as F}from"os";import{basename as W,dirname as L,join as c}from"path";import{fileURLToPath as H}from"url";var S="<!-- claude-board:start -->",U="<!-- claude-board:end -->",P=`${S}
 ## Claude Board
 This repo is driven from a live visual board (MCP server \`board\`, state in \`.claude-board/\`).
 - Start with \`resume\`. Plan with \`plan\`, report with \`update\` deltas. Don't narrate progress in chat.

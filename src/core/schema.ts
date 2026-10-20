@@ -144,6 +144,7 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approvePhase'), id: z.string() }),
   z.object({ type: z.literal('approveMany'), ids: z.array(z.string()).min(1).max(50) }),
   z.object({ type: z.literal('ask'), id: z.string() }),
+  z.object({ type: z.literal('hold'), id: z.string() }),
   z.object({ type: z.literal('reject'), id: z.string() }),
   z.object({ type: z.literal('retry'), id: z.string() }),
   z.object({ type: z.literal('split'), id: z.string() }),

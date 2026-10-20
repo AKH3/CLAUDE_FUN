@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Phase, Step } from '../../../src/core/schema';
-import { childrenOf, depsMet, hasChildren } from '../../../src/core/tree';
+import { childrenOf, depsMet, hasChildren, runLine } from '../../../src/core/tree';
 import { duration, kfmt, STATUS_COLOR, STATUS_ICON } from '../format';
 import { useBoard, useT } from '../store';
 import { Effort } from './Effort';
@@ -120,6 +120,7 @@ function StepPanel({ st }: { st: Step }) {
   const kids = childrenOf(state, st.id);
   const tokens = usage?.steps[st.id] ?? 0;
   const status = locked ? 'locked' : st.s;
+  const place = runLine(state).findIndex((x) => x.id === st.id) + 1;
 
   return (
     <>
@@ -166,6 +167,13 @@ function StepPanel({ st }: { st: Step }) {
             })}
           </div>
         )}
+        {place > 0 && (
+          <div className="mt-2 flex items-center gap-1.5 text-[12px] text-run">
+            <Icon name="list" size={12} />
+            <span className="font-semibold">{place === 1 ? t('line.next') : `${t('line.place')} ${place}`}</span>
+            <span className="text-muted">· {t('line.hint')}</span>
+          </div>
+        )}
         {st.by === 'user' && <div className="mt-2 text-[12px] text-gold">★ {t('by.user')}</div>}
         {st.e && (
           <div className="mt-2 flex items-center gap-1.5 text-[12px]">
@@ -182,6 +190,11 @@ function StepPanel({ st }: { st: Step }) {
           {(st.s === 'todo' || st.s === 'block') && (
             <Btn icon="play" tone="done" onClick={() => act({ type: 'approve', id: st.id }, st.id)}>
               {t('act.approve')}
+            </Btn>
+          )}
+          {st.s === 'ok' && (
+            <Btn icon="pause" onClick={() => act({ type: 'hold', id: st.id }, `${t('act.hold')} · ${st.id}`)}>
+              {t('act.hold')}
             </Btn>
           )}
           {!container && !['done', 'skip'].includes(st.s) && (

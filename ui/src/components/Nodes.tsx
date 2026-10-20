@@ -93,7 +93,7 @@ function PickBtn({ id, n }: { id: string; n: number }) {
 }
 
 export const StepNode = memo(function StepNode({ data, selected }: NodeProps<StepNodeT>) {
-  const { step: st, locked, container, kids, kidsDone, tokens, rtl } = data;
+  const { step: st, locked, container, kids, kidsDone, tokens, rtl, place } = data;
   const t = useT();
   const act = useBoard((s) => s.act);
   const status = locked ? 'locked' : st.s;
@@ -207,6 +207,14 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
             <span className="flex items-center gap-1 text-muted">
               <Icon name="lock" size={11} />
               <span dir="ltr">{st.deps.join(', ')}</span>
+            </span>
+            <span className="ms-auto">{pickBtn}</span>
+          </>
+        ) : place ? (
+          <>
+            <span className="flex items-center gap-1 rounded-md bg-run/15 px-1.5 py-0.5 font-semibold text-run" title={t('line.hint')}>
+              <Icon name="list" size={10} />
+              {place === 1 ? t('line.next') : `${t('line.place')} ${place}`}
             </span>
             <span className="ms-auto">{pickBtn}</span>
           </>
