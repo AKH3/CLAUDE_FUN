@@ -66,7 +66,7 @@ export function summary(
   if (failed.length) lines.push(`${failed[0].s} ${failed.map((x) => x.id).slice(0, 4).join(',')}`);
 
   if (!running.length && !next && !waiting.length && done === ls.length) lines.push('all done');
-  else if (!running.length && !next && waiting.length) lines.push('-> await');
+  else if (!running.length && !next && waiting.length) lines.push('-> end turn; the board wakes you on approval');
 
   // questions Claude was told about but hasn't answered yet (e.g. the session ended)
   const fresh = new Set(opts.msgs?.filter((d) => d.k === 'ask').map((d) => d.s));
@@ -87,7 +87,7 @@ export function afterUpdate(s: State, ids: string[]): string {
     const next = nextStep(s);
     if (next) return `next ${next.id} ${title(next)}`;
     const waiting = leaves(s).filter((x) => x.s === 'todo');
-    if (waiting.length) return `wait ${waiting[0].id} need approval -> await`;
+    if (waiting.length) return `wait ${waiting[0].id} need approval -> end turn`;
     if (leaves(s).every((x) => x.s === 'done' || x.s === 'skip')) return 'all done';
   }
   return '';

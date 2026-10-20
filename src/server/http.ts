@@ -8,6 +8,7 @@ import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { diff, isRepo, snapshot } from '../core/git.js';
+import { claudeStatus, type ClaudeStatus } from '../core/listen.js';
 import { applyAction, findStep } from '../core/ops.js';
 import { ActionSchema, type State, type Usage } from '../core/schema.js';
 import { Store } from '../core/store.js';
@@ -17,6 +18,8 @@ export interface BoardServer {
   url: string;
   port: number;
   hosted: boolean;
+  /** Re-reads state.json and pushes it to open boards (hosted boards only). */
+  refresh?: () => void;
   close(): Promise<void>;
 }
 
@@ -55,6 +58,7 @@ export function createApp(root: string, opts: BoardOptions = {}) {
   const repo = isRepo(root);
   let usage: Usage | undefined = store.readUsage();
   let state: State = store.read();
+  let claude: ClaudeStatus = claudeStatus(store);
 
   const broadcast = (event: string, data: unknown) => {
     const payload = JSON.stringify(data);
@@ -84,9 +88,18 @@ export function createApp(root: string, opts: BoardOptions = {}) {
     } catch {}
   };
 
+  // whether a click can reach Claude right now (see core/listen.ts)
+  const refreshClaude = () => {
+    const next = claudeStatus(store);
+    if (next === claude) return;
+    claude = next;
+    broadcast('claude', { status: claude });
+  };
+
   let timer: NodeJS.Timeout | undefined;
   const watcher = watch(store.p.dir, { ignoreInitial: true, depth: 0 });
   watcher.on('all', (_ev, file) => {
+    if (file.endsWith('.listen.json') || file.endsWith('.live.json')) return refreshClaude();
     if (opts.usage === false && file.endsWith('usage.json')) {
       // usage written by someone else (demo / external tool): just relay it
       const u = store.readUsage();
@@ -98,10 +111,12 @@ export function createApp(root: string, opts: BoardOptions = {}) {
     timer = setTimeout(refreshState, 30);
   });
   const usageTimer = setInterval(() => refreshUsage(), 3000);
-  // safety net in case a file event is missed (network drives, editors that rewrite oddly)
+  // safety net in case a file event is missed (network drives, editors that rewrite oddly);
+  // also notices a session that closed, which writes no file
   const pollTimer = setInterval(() => {
     if (store.rev() !== state.rev) refreshState();
-  }, 1500);
+    refreshClaude();
+  }, 1000);
 
   const app = new Hono();
 
@@ -119,13 +134,14 @@ export function createApp(root: string, opts: BoardOptions = {}) {
 
   app.get('/api/ping', (c) => c.json({ app: 'claude-board', root, pid: process.pid }));
 
-  app.get('/api/state', (c) => c.json({ state, usage, git: repo, root }));
+  app.get('/api/state', (c) => c.json({ state, usage, git: repo, root, claude }));
 
   app.get('/api/events', (c) =>
     streamSSE(c, async (stream) => {
       const client: Client = (event, data) => void stream.writeSSE({ event, data }).catch(() => {});
       clients.add(client);
       await stream.writeSSE({ event: 'state', data: JSON.stringify(state) });
+      await stream.writeSSE({ event: 'claude', data: JSON.stringify({ status: claude }) });
       if (usage) await stream.writeSSE({ event: 'usage', data: JSON.stringify(usage) });
       const ping = setInterval(() => void stream.writeSSE({ event: 'ping', data: '' }).catch(() => {}), 20_000);
       await new Promise<void>((resolve) => stream.onAbort(resolve));
@@ -172,7 +188,7 @@ export function createApp(root: string, opts: BoardOptions = {}) {
     await watcher.close();
   };
 
-  return { app, store, close };
+  return { app, store, close, refresh: refreshState };
 }
 
 function listen(fetch: Hono['fetch'], port: number): Promise<ServerType> {
@@ -194,6 +210,12 @@ async function pingRoot(port: number): Promise<string | undefined> {
 
 const sameRoot = (a: string, b: string) => normalize(a).toLowerCase() === normalize(b).toLowerCase();
 
+/** Is this project's board answering on that port? */
+export async function boardUp(root: string, port: number): Promise<boolean> {
+  const other = await pingRoot(port);
+  return !!other && sameRoot(other, root);
+}
+
 const existing = (port: number): BoardServer => ({ url: `http://localhost:${port}`, port, hosted: false, close: async () => {} });
 
 /** Starts (or finds an existing) board server for this project. */
@@ -201,13 +223,10 @@ export async function startBoard(root: string, opts: BoardOptions = {}): Promise
   // The live board may sit on any port (e.g. `mcp --port 3014`), so try the one
   // it recorded first. Only a ping proves it: a hard kill leaves a stale file.
   const live = new Store(root).readRuntime()?.port;
-  if (live) {
-    const other = await pingRoot(live);
-    if (other && sameRoot(other, root)) return existing(live);
-  }
+  if (live && (await boardUp(root, live))) return existing(live);
 
   const first = opts.port ?? 3000;
-  const { app, store, close } = createApp(root, opts);
+  const { app, store, close, refresh } = createApp(root, opts);
   for (let port = first; port < first + 25; port++) {
     try {
       const server = await listen(app.fetch, port);
@@ -218,6 +237,7 @@ export async function startBoard(root: string, opts: BoardOptions = {}): Promise
         url,
         port,
         hosted: true,
+        refresh,
         close: async () => {
           await close();
           await new Promise<void>((r) => server.close(() => r()));
@@ -226,8 +246,7 @@ export async function startBoard(root: string, opts: BoardOptions = {}): Promise
       };
     } catch (e: any) {
       if (e?.code !== 'EADDRINUSE') throw e;
-      const other = await pingRoot(port);
-      if (other && sameRoot(other, root)) {
+      if (await boardUp(root, port)) {
         await close();
         return existing(port);
       }

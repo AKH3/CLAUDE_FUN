@@ -39,9 +39,16 @@ describe('init', () => {
     expect(st.env).toEqual({ FOO: '1', MCP_TOOL_TIMEOUT: '600000' });
     expect(st.permissions.allow).toEqual(['Bash(npm test)', 'mcp__board']);
     expect(st.enabledMcpjsonServers).toEqual(['board']);
-    expect(st.hooks.SessionStart).toHaveLength(1);
-    expect(st.hooks.UserPromptSubmit).toHaveLength(1);
+    // each event: our sync hook plus the background watcher that lets a board click wake Claude
+    expect(st.hooks.SessionStart).toHaveLength(2);
+    expect(st.hooks.UserPromptSubmit).toHaveLength(2);
+    expect(st.hooks.Stop).toHaveLength(1);
     expect(st.hooks.PreToolUse).toHaveLength(2); // the user's own hook survives
+    const watch = st.hooks.SessionStart.find((g: any) => g.hooks[0].command.endsWith('hook watch'));
+    expect(watch.matcher).toBe('startup|resume|clear');
+    expect(watch.hooks[0]).toMatchObject({ type: 'command', asyncRewake: true });
+    expect(watch.hooks[0].timeout).toBeUndefined();
+    expect(st.hooks.Stop[0].hooks[0]).toMatchObject({ asyncRewake: true, command: expect.stringMatching(/ hook watch$/) });
     const guard = st.hooks.PreToolUse.find((g: any) => g.hooks[0].command.endsWith('hook guard'));
     expect(guard.matcher).toBe('Edit|Write|MultiEdit|NotebookEdit|Bash');
     // path is quoted with forward slashes, so spaces and backslashes are safe in bash and cmd

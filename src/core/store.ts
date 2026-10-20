@@ -13,7 +13,7 @@ const LOCK_TIMEOUT_MS = 8_000;
 const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
 export const sleepSync = (ms: number) => Atomics.wait(sleepBuf, 0, 0, ms);
 
-const BOARD_GITIGNORE = ['.runtime.json', '.session.json', 'usage.json', 'tmp-index', '.lock', '*.tmp', ''].join('\n');
+const BOARD_IGNORED = ['.runtime.json', '.session.json', '.listen.json', '.live.json', 'usage.json', 'tmp-index', '.lock', '*.tmp'];
 
 export interface Runtime {
   port: number;
@@ -36,8 +36,11 @@ export class Store {
   /** Creates .claude-board/ with an empty state if needed. Returns true when created. */
   init(name = basename(this.root), goal?: string): boolean {
     mkdirSync(this.p.dir, { recursive: true });
+    // boards made by older versions get the newer runtime files added
     const gi = `${this.p.dir}/.gitignore`;
-    if (!existsSync(gi)) writeFileSync(gi, BOARD_GITIGNORE);
+    const cur = existsSync(gi) ? readFileSync(gi, 'utf8') : '';
+    const missing = BOARD_IGNORED.filter((x) => !cur.split(/\r?\n/).includes(x));
+    if (missing.length) writeFileSync(gi, cur + (cur && !cur.endsWith('\n') ? '\n' : '') + missing.join('\n') + '\n');
     if (this.exists()) return false;
     this.write(emptyState(name, goal));
     return true;

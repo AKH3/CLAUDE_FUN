@@ -13,14 +13,25 @@ const SNIPPET_END = '<!-- claude-board:end -->';
 const SNIPPET = `${SNIPPET_START}
 ## Claude Board
 This repo is driven from a live visual board (MCP server \`board\`, state in \`.claude-board/\`).
-- Start with \`resume\`. Plan with \`plan\`, report with \`update\` deltas, and wait with \`await\`. Don't narrate progress in chat.
-- Only approved steps can run. Keep chat replies to 1-2 lines, because the board shows the details.
+- Start with \`resume\`. Plan with \`plan\`, report with \`update\` deltas. Don't narrate progress in chat.
+- Only approved steps can run. With nothing approved, end your turn: the board wakes you when the user clicks.
+- Keep chat replies to 1-2 lines, because the board shows the details.
+- If the user asks to open the board, run \`claude-fun\` here (\`claude-fun.cmd\` on Windows): it opens the running board in their browser.
 ${SNIPPET_END}
 `;
 
 const HOOK_MARK = /claude-fun|claude-board|cli\.(m?js|ts)/;
 const BOARD_TOOLS = 'mcp__board';
 const GUARD_MATCHER = 'Edit|Write|MultiEdit|NotebookEdit|Bash';
+// not "compact": that one fires mid-turn, while Claude is already working
+const WATCH_START_MATCHER = 'startup|resume|clear';
+// Runs in the background; exit code 2 wakes Claude (see watchBoard).
+const WATCH_HOOK = {
+  asyncRewake: true,
+  rewakeMessage: 'Claude Board:',
+  rewakeSummary: 'Claude Board: a click on the board',
+};
+const OUR_HOOKS = /( hook (session-start|prompt|guard|watch))$/;
 const MCP_TIMEOUT_MS = '600000';
 
 export interface InitOptions {
@@ -98,17 +109,21 @@ export function init(root: string, opts: InitOptions = {}): string[] {
 
   if (opts.hooks !== false) {
     settings.hooks ??= {};
-    const put = (event: string, hook: string, matcher?: string) => {
+    const put = (event: string, hook: string, matcher?: string, extra: Record<string, unknown> = { timeout: 10 }) => {
       const list: any[] = (settings.hooks[event] ?? []).filter(
-        (g: any) => !(g.hooks ?? []).some((h: any) => HOOK_MARK.test(h.command ?? '') && (h.command ?? '').includes(` hook ${hook}`)),
+        (g: any) => !(g.hooks ?? []).some((h: any) => HOOK_MARK.test(h.command ?? '') && (h.command ?? '').endsWith(` hook ${hook}`)),
       );
-      list.push({ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: `${run.shell} hook ${hook}`, timeout: 10 }] });
+      list.push({ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: `${run.shell} hook ${hook}`, ...extra }] });
       settings.hooks[event] = list;
     };
     put('SessionStart', 'session-start');
     put('UserPromptSubmit', 'prompt');
     put('PreToolUse', 'guard', GUARD_MATCHER);
-    report.push('+ .claude/settings.json → hooks (session-start, prompt, guard) + allow mcp__board');
+    // the watcher restarts at each of these, so one is always waiting for a click
+    put('SessionStart', 'watch', WATCH_START_MATCHER, WATCH_HOOK);
+    put('UserPromptSubmit', 'watch', undefined, WATCH_HOOK);
+    put('Stop', 'watch', undefined, WATCH_HOOK);
+    report.push('+ .claude/settings.json → hooks (session-start, prompt, guard, watch) + allow mcp__board');
   } else {
     report.push('+ .claude/settings.json → allow mcp__board');
   }
@@ -162,7 +177,7 @@ export function remove(root: string, opts: { purge?: boolean; backupDir?: string
     const s = readJson(settingsFile);
     let touched = false;
     for (const [event, groups] of Object.entries<any[]>(s.hooks ?? {})) {
-      const kept = groups.filter((g) => !(g.hooks ?? []).some((h: any) => HOOK_MARK.test(h.command ?? '') && / hook (session-start|prompt|guard)$/.test(h.command ?? '')));
+      const kept = groups.filter((g) => !(g.hooks ?? []).some((h: any) => HOOK_MARK.test(h.command ?? '') && OUR_HOOKS.test(h.command ?? '')));
       if (kept.length !== groups.length) touched = true;
       if (kept.length) s.hooks[event] = kept;
       else delete s.hooks[event];

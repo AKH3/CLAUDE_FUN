@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import type { Action, State, Usage } from '../../src/core/schema';
+import type { Action, ClaudeStatus, State, Usage } from '../../src/core/schema';
 import { translate, type I18nKey, type Lang } from './i18n';
 
 export type Theme = 'dark' | 'light';
 
 export interface Toast {
   id: number;
-  kind: 'done' | 'fail' | 'phase' | 'plan' | 'sent' | 'error';
+  kind: 'done' | 'fail' | 'phase' | 'plan' | 'sent' | 'later' | 'error';
   text: string;
 }
 
@@ -15,6 +15,8 @@ interface BoardStore {
   usage?: Usage;
   git: boolean;
   connected: boolean;
+  /** Whether a click can reach Claude right now. */
+  claude: ClaudeStatus;
   problem?: string;
   selected?: string;
   diff?: { id: string; file?: string };
@@ -30,6 +32,9 @@ interface BoardStore {
   setState: (s: State) => void;
   setUsage: (u: Usage) => void;
   setConnected: (v: boolean) => void;
+  setClaude: (c: ClaudeStatus) => void;
+  /** True when a click reaches Claude within seconds. */
+  live: () => boolean;
   setProblem: (p?: string) => void;
   setGit: (v: boolean) => void;
   select: (id?: string) => void;
@@ -47,6 +52,9 @@ interface BoardStore {
   openAdd: (target: { phase: string } | 'phase') => void;
   closeAdd: () => void;
 }
+
+// board housekeeping that Claude doesn't need to act on
+const LOCAL: Action['type'][] = ['archive', 'unarchive', 'setCfg', 'setGuard', 'reorder', 'edit'];
 
 // anything not running can be picked: open ones to start, any of them to archive
 const PICKABLE = ['todo', 'ok', 'block', 'done', 'fail', 'skip'];
@@ -80,6 +88,7 @@ const collapseKey = (s: State | undefined, phaseId: string) => `${s?.project.nam
 export const useBoard = create<BoardStore>((set, get) => ({
   git: false,
   connected: false,
+  claude: 'away',
   lang: saved<Lang>('cb.lang', 'ar'),
   theme: saved<Theme>('cb.theme', 'dark'),
   toasts: [],
@@ -94,6 +103,8 @@ export const useBoard = create<BoardStore>((set, get) => ({
     })),
   setUsage: (usage) => set({ usage }),
   setConnected: (connected) => set({ connected }),
+  setClaude: (claude) => set({ claude }),
+  live: () => get().connected && (get().claude === 'ready' || get().claude === 'working'),
   setProblem: (problem) => set({ problem }),
   setGit: (git) => set({ git }),
   select: (selected) => set({ selected }),
@@ -110,7 +121,7 @@ export const useBoard = create<BoardStore>((set, get) => ({
   toast: (kind, text) => {
     const id = ++toastSeq;
     set((s) => ({ toasts: [...s.toasts.slice(-3), { id, kind, text }] }));
-    setTimeout(() => get().dropToast(id), kind === 'phase' ? 5000 : 3200);
+    setTimeout(() => get().dropToast(id), kind === 'phase' || kind === 'later' ? 6000 : 3200);
   },
   dropToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   act: async (a, sentLabel) => {
@@ -122,9 +133,14 @@ export const useBoard = create<BoardStore>((set, get) => ({
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
-      // archiving is housekeeping on the board, so it doesn't claim a message went to Claude
-      const local = a.type === 'archive' || a.type === 'unarchive';
-      if (sentLabel) get().toast(local ? 'done' : 'sent', local ? sentLabel : `${translate(get().lang, 'sent')} · ${sentLabel}`);
+      const { lang, toast, live } = get();
+      // housekeeping stays on the board; everything else says honestly when Claude will see it
+      if (LOCAL.includes(a.type)) {
+        if (sentLabel) toast('done', sentLabel);
+      } else {
+        const when = translate(lang, live() ? 'sent.live' : 'sent.later');
+        toast(live() ? 'sent' : 'later', sentLabel ? `${when} · ${sentLabel}` : when);
+      }
       return true;
     } catch (e: any) {
       get().toast('error', e?.message ?? String(e));

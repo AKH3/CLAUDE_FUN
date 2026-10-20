@@ -24,6 +24,7 @@ export function connect() {
     .then((r) => r.json())
     .then((j) => {
       store.setGit(!!j.git);
+      if (j.claude) store.setClaude(j.claude);
       if (!useBoard.getState().state) store.setState(j.state);
       if (j.usage) store.setUsage(j.usage);
     })
@@ -39,6 +40,7 @@ export function connect() {
     announce(prev, next);
     useBoard.getState().setState(next);
   });
+  es.addEventListener('claude', (e) => useBoard.getState().setClaude(JSON.parse((e as MessageEvent).data).status));
   es.addEventListener('usage', (e) => useBoard.getState().setUsage(JSON.parse((e as MessageEvent).data)));
   es.addEventListener('problem', (e) => useBoard.getState().setProblem(JSON.parse((e as MessageEvent).data).message));
   return () => es.close();

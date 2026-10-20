@@ -21,17 +21,17 @@
 
 ```mermaid
 flowchart LR
-  C[Claude Code] -- "MCP: resume / plan / update / await" --> E[المحرك المحلي<br/>Hono + MCP]
+  C[Claude Code] -- "MCP: resume / plan / update" --> E[المحرك المحلي<br/>Hono + MCP]
   E <--> S[(.claude-board/state.json)]
   S -- "chokidar → SSE" --> B[اللوحة في المتصفح<br/>React Flow]
   B -- "اعتماد / تقسيم / ترتيب / ملاحظة" --> E
   E -- "توجيهات صامتة" --> C
-  H[Hooks] -- "سياق الاستئناف + حارس التعديلات" --> C
+  H[Hooks] -- "سياق الاستئناف + حارس التعديلات + إيقاظ كلاود عند الضغط" --> C
 ```
 
 ## البدء السريع
 
-> جديد على الطرفية أو Claude Code؟ ابدأ من [دليل التشغيل للمبتدئين](docs/GUIDE-ar.md).
+> تستخدم تطبيق Claude على الكمبيوتر بدون طرفية، أو جديد على Claude Code؟ ابدأ من [دليل التشغيل للمبتدئين](docs/GUIDE-ar.md): كل خطواته بالكلام مع كلاود والضغط على اللوحة.
 >
 > أو دع كلاود يثبّتها لك: انسخ المجلد [`skills/claude-board-setup`](skills/claude-board-setup) إلى `~/.claude/skills/`، ثم قل لكلاود داخل مشروعك «ثبّت لوحة كلاود».
 
@@ -64,20 +64,21 @@ claude-fun demo --simulate
 | الميزة | ماذا تفعل |
 |---|---|
 | **شجرة المراحل** | كل مرحلة عمود (من اليمين لليسار بالعربية)، والخطوات تحتها، والمهام الفرعية متفرعة منها. العقد تضيء عند الإنجاز، والمرحلة المكتملة تتحول للذهبي. |
-| **بوابات الإذن** | البطاقة بانتظار الاعتماد تنبض، وفيها زر ✓ «اعتماد البدء» وزر ✂ «قسّم الخطوة». يوجد أيضاً زر «اعتماد المرحلة» لاعتماد مرحلة كاملة دفعة واحدة. |
+| **اللوحة توقظ كلاود** | أي ضغطة تحتاج كلاود (ابدأ، سؤال، رسالة، تقسيم، إعادة) توصله خلال ثواني حتى لو كان واقف، بدون ما تكتب له في المحادثة. أعلى اللوحة يقول لك دائماً: «كلاود يشتغل» أو «كلاود جاهز» أو «كلاود مو مفتوح». وإذا ما قدر يوصل، يطلع شريط يقول لك وش تكتب بالضبط. |
+| **بوابات الإذن** | البطاقة بانتظار موافقتك تنبض، وفيها زر «ابدأ». يوجد أيضاً «ابدأ المرحلة كلها» على بطاقة المرحلة. التقسيم والرفض والإعادة داخل البطاقة (اضغط عليها). |
 | **بدء عدة مهام بالترتيب** | اضغط `#` على البطاقات بالترتيب الذي تريده فتترقّم 1 و2 و3، ثم «ابدأ بالترتيب». ينفّذها كلاود واحدة تلو الأخرى دون توقف، ويصله سطر واحد فقط. |
-| **اسأل كلاود ❔** | زر `?` على كل بطاقة: يشرح كلاود الخطوة وفائدتها المتوقعة في 25 كلمة أو أقل. لا يُسأل إلا عند الضغط، والإجابة تُحفظ فلا تتكرر تكلفتها. |
+| **وش هذي الخطوة؟ ❔** | زر `?` على كل بطاقة يعرض فوراً شرحاً قصيراً لما تفعله الخطوة وفائدتها، يكتبه كلاود مع الخطة نفسها (ويظهر أيضاً عند مرور الماوس). الخطوات القديمة بدون شرح: يُسأل كلاود عند الضغط، وتُحفظ الإجابة. |
 | **الجهد المتوقع** | يقدّر كلاود جهد كل خطوة (خفيف / متوسط / كبير) ويظهر كأعمدة صغيرة بجانب رقمها، برقم واحد فقط في الخطة. |
 | **طي المراحل** | اضغط على بطاقة المرحلة لتطوي خطواتها أو تعرضها. زر ⓘ يفتح تفاصيل المرحلة. |
 | **مهمة جديدة من اللوحة** | مربع «+ مهمة جديدة» أسفل كل مرحلة يفتح نافذة فيها العنوان والتفاصيل، وتختار هل تبدأ مباشرة أو تنتظر اعتمادك. ومربع «+ مرحلة جديدة» بعد آخر مرحلة. |
 | **الأرشيف** | أرشف مرحلة مكتملة بزر 🗃 على بطاقتها، أو حدّد عدة مهام بـ `#` واضغط «أرشفة». تختفي من اللوحة ومن ملخص كلاود فيقلّ ما يقرأه، وتبقى محفوظة في `.claude-board/state.json` وتسترجعها من زر الأرشيف بالأعلى. |
-| **أوامر سريعة** | زر `>_` بالأعلى: عبارات جاهزة لكلاود وأوامر للطرفية، تنسخها بضغطة. |
+| **اكتب لكلاود** | زر «اكتب لكلاود» بالأعلى: تكتب طلبك وترسله، فيصل كلاود ويبدأ بدون ما تفتح المحادثة. فيه أفكار جاهزة تضغطها وتعدّلها، وشرح مختصر لأزرار اللوحة. واللوحة الفارغة تسألك «وش تبي تبني؟» وترسل فكرتك لكلاود ليرسم الخطة. |
 | **كبسولة النتائج** | لكل خطوة منجزة: عدد الملفات، والأسطر المضافة والمحذوفة، وحالة الاختبار، والمدة، والتوكنز. يحسبها المحرك من git بنفسه، فلا تكلّف كلاود شيئاً. |
 | **عرض التعديلات** | زر واحد يفتح diff الخطوة بالضبط، حتى بدون commits، لأن المحرك يلتقط شجرة العمل عند بداية الخطوة وعند نهايتها. |
 | **عدّاد كفاءة التوكنز** | أرقام حقيقية من سجلات Claude Code، موزعة على المراحل والخطوات ومقارنة بالميزانية. |
 | **أوامر صامتة** | عندما تسحب بطاقة لتغيير أولويتها أو تكتب ملاحظة، يتحول ذلك إلى سطر قصير يصل كلاود مع خطوته التالية، مثل `S3.1 prio 1; S2.4 note:"استخدم zod v4"`. |
 | **حارس التعديلات** | في وضع «صارم» يمنع الهوك أي تعديل ملف، وأي أمر Bash يكتب ملفات (`>` و `sed -i` و `rm` و `git checkout` و `npm install`…)، ما لم تكن هناك خطوة معتمدة قيد التنفيذ. وضع «الحساس» يحمي `.env` والترحيلات وما شابهها فقط، ووضع «مطفأ» يلغي الحماية. |
-| **عربي / English** | تبديل اللغة والاتجاه، وثيم داكن وفاتح. يمكن ضبطهما من الرابط أيضاً: `?lang=en&theme=light`. |
+| **الإعدادات** | زر الإعدادات بالأعلى فيه اللغة (عربي / English) والمظهر (داكن / فاتح) وحارس التعديلات والاعتماد التلقائي. اللغة والمظهر يمكن ضبطهما من الرابط أيضاً: `?lang=en&theme=light`. |
 
 ## بروتوكول التوكنز الصفري
 
@@ -88,7 +89,7 @@ claude-fun demo --simulate
 | `resume` | ملخص الحالة مع توجيهاتك غير المقروءة. أول ما يستدعيه كلاود. |
 | `plan` | إضافة مراحل وخطوات دفعة واحدة. التقسيم يتم بتمرير `parent`. الخطوات الجديدة تنتظر اعتمادك. |
 | `update` | الفروقات: `s:"run"` قبل العمل، ثم `done` أو `fail` بعده، مع ملاحظة لا تتجاوز 8 كلمات. |
-| `await` | ينتظر حتى تعتمد أو ترسل توجيهاً من اللوحة، ثم يكمل كلاود تلقائياً. |
+| `await` | نادراً ما يُحتاج: ينتظر ضغطة منك. الأصل أن ينهي كلاود دوره، واللوحة توقظه عند الضغط. |
 
 مثال على ما يقرأه كلاود عند الاستئناف:
 
@@ -107,7 +108,7 @@ board http://localhost:3000
 - `.claude-board/state.json`: الخطة والحالة. يمكنك إضافته لـ git لتشاركه مع فريقك.
 - `.claude-board/.gitignore`: يتجاهل ملفات التشغيل المؤقتة.
 - `.mcp.json`: يضيف الخادم `board`.
-- `.claude/settings.json`: يضيف الهوكس الثلاثة (`SessionStart` و`UserPromptSubmit` و`PreToolUse` على أدوات التعديل و Bash)، ويسمح بأدوات `mcp__board` حتى لا يُطلب إذنك عند كل تحديث، ويضبط `MCP_TOOL_TIMEOUT=600000` (10 دقائق) إن لم يكن مضبوطاً، حتى لا ينقطع `await` وأنت تراجع.
+- `.claude/settings.json`: يضيف الهوكس (`SessionStart` و`UserPromptSubmit` و`PreToolUse` على أدوات التعديل و Bash)، ومعها هوك `watch` على `SessionStart` و`UserPromptSubmit` و`Stop`. هذا الأخير يعمل في الخلفية (`asyncRewake`) وينتظر ضغطتك على اللوحة، فإذا جاءت أيقظ كلاود. ويسمح بأدوات `mcp__board` حتى لا يُطلب إذنك عند كل تحديث، ويضبط `MCP_TOOL_TIMEOUT=600000` (10 دقائق) إن لم يكن مضبوطاً.
 - `CLAUDE.md`: مقطع من 5 أسطر يذكّر كلاود بالبروتوكول.
 
 خيارات مفيدة: `--guard sensitive` و `--no-hooks` و `--no-claude-md`.
@@ -121,7 +122,7 @@ board http://localhost:3000
 | `claude-fun remove` | يلغي ما أضافه `init` بعد أخذ نسخة احتياطية. `--purge` يحذف اللوحة أيضاً، و `--backup <dir>` يحدد مكان النسخة. |
 | `claude-fun status` | يطبع ملخص الاستئناف في الطرفية. |
 | `claude-fun mcp` | خادم MCP عبر stdio. يستدعيه Claude Code بنفسه. |
-| `claude-fun hook <name>` | معالجات الهوكس: `session-start` و `prompt` و `guard`. |
+| `claude-fun hook <name>` | معالجات الهوكس: `session-start` و `prompt` و `guard` و `watch`. |
 | `claude-fun demo --simulate` | لوحة تجريبية تتحرك وحدها. |
 
 ## الأمان
@@ -132,7 +133,9 @@ board http://localhost:3000
 
 ## حل المشكلات
 
-- **ينتهي `await` قبل أن تعتمد:** ينتظر `await` حتى 300 ثانية ثم يعود، ويرسل المحرك إشعارات تقدّم كل 15 ثانية. يضبط `init` المتغير `MCP_TOOL_TIMEOUT` على 10 دقائق، ويمكنك رفعه في `.claude/settings.json`.
+- **أعلى اللوحة يقول «كلاود ما يسمع اللوحة»:** الجلسة مفتوحة لكن هوك `watch` غير موجود (مشروع جُهّز بنسخة قبل 0.4.0)، أو نسخة Claude Code قديمة. أعد `claude-fun init` في المشروع، أو قل لكلاود «حدّث لوحة كلاود»، ثم افتح جلسة جديدة.
+- **أعلى اللوحة يقول «كلاود مو مفتوح»:** لا توجد جلسة Claude Code مفتوحة على المشروع. ضغطاتك محفوظة، وتصل كلاود أول ما تفتح جلسة وتكتب له.
+- **كلاود لا يوقظه إلا ما يحتاجه:** «ابدأ» والسؤال والرسالة والتقسيم والإعادة توقظه. أما السحب لتغيير الترتيب، وتغيير الاسم، والأرشفة، والملاحظة على خطوة لم تبدأ، فتنتظر دوره التالي حتى لا تُصرف توكنز بلا داعٍ.
 - **مسار فيه مسافات** مثل `D:\Program Files x86`: يكتب `init` المسار بشرطات أمامية وبين علامتي تنصيص، فيعمل في bash وفي cmd.
 - **المنفذ 3000 مشغول:** المحرك يجرّب المنافذ التالية تلقائياً، ويكتب المنفذ المستخدم في `.claude-board/.runtime.json`. يقرأ `claude-fun` هذا الملف أولاً ويتأكد أن اللوحة تردّ فعلاً، فيفتح نفس اللوحة بدل تشغيل نسخة ثانية.
 - **نقلت الأداة إلى مكان آخر:** أعد تشغيل `claude-fun init`، لأن الهوكس تشير إلى المسار المطلق للأداة.
@@ -198,20 +201,21 @@ Run `init` inside a project folder: it refuses your home folder and drive roots,
 ### Features
 
 - **Skill-tree canvas:** phases as columns (mirrored in Arabic), steps beneath them, substeps branching off, and deps drawn as links. Nodes light up as they finish, and completed phases turn gold.
-- **Permission checkpoints:** *Approve*, *Split*, *Reject* and *Retry* on every card, plus *Approve phase*.
+- **The board wakes Claude:** a click that needs Claude (Start, a question, a message, Split, Retry) reaches it within seconds even when it is idle, with no need to type in the chat. A background `watch` hook (`asyncRewake`) waits for the click and starts a new turn. The top bar always says whether Claude is working, ready, or not open, and when a click can't reach it, a banner says exactly what to type.
+- **Permission checkpoints:** a *Start* button on every waiting card, plus *Start the whole phase*. Split, Reject and Retry are inside the card.
 - **Start several in order:** tap `#` on cards in the order you want (they number 1, 2, 3), then *Start in order*. Claude runs them back to back, and receives a single line.
-- **Ask Claude (`?`):** a 25-word-max explanation of what a step does and its expected benefit. Asked only when you press it, and cached on the step.
+- **What is this step? (`?`):** a short explanation of what a step does and why, written by Claude with the plan, so it opens instantly (and shows on hover). Older steps without one ask Claude on click, and the answer is cached.
 - **Expected effort:** Claude rates each step small/medium/large (one digit in the plan), shown as bars next to its id.
 - **Collapsible phases:** click a phase card to fold or unfold its steps; ⓘ opens the phase details.
 - **Add from the board:** a *+ New task* box closes every phase column and opens a dialog for a title and details; you choose whether Claude may start it right away. *+ New phase* sits after the last column.
 - **Archive:** archive a finished phase from its card, or pick tasks with `#` and press *Archive*. They leave the board and Claude's summary, stay in `.claude-board/state.json`, and come back from the archive panel.
-- **Quick commands:** the `>_` button lists copy-ready phrases for Claude and terminal commands.
+- **Message Claude:** write a request on the board and send it; it reaches Claude without opening the chat. Ready-made ideas to click and edit, and a short guide to the board's buttons. An empty board asks "What do you want to build?" and sends your idea to Claude to plan.
 - **Result capsules:** files changed, +/− lines, test status, duration and tokens, all computed by the engine from git snapshots taken in a throwaway index. No commits are needed and Claude spends zero tokens on them.
 - **One-click diff** for exactly what a step changed.
 - **Token efficiency meter:** real usage parsed from Claude Code's session logs, attributed to phases and steps, against a budget.
 - **Silent directives:** dragging a card or writing a note becomes a one-line directive delivered with Claude's next tool call or prompt.
 - **Edit guard hook:** `strict` (no file edits, and no file-writing Bash commands such as redirects, `sed -i`, `rm`, `git checkout` or `npm install`, unless an approved step is running), `sensitive` (protect `.env*`, migrations and similar) or `off`. The Bash check is a pattern heuristic, not a sandbox.
-- **Arabic/English, dark/light**, also settable from the URL with `?lang=en&theme=light`.
+- **Settings menu:** language (Arabic/English), theme (dark/light), the edit guard and auto-approve. Language and theme can also be set from the URL with `?lang=en&theme=light`.
 
 ### MCP tools
 
@@ -220,11 +224,11 @@ Run `init` inside a project folder: it refuses your home folder and drive roots,
 | `resume` | Compact status plus unread user directives. Claude calls it first. |
 | `plan` | Add phases and steps; pass `parent` to split. New steps await approval. |
 | `update` | Deltas: `s:"run"` before work, `done`/`fail` after, a note of 8 words or fewer, and test status. |
-| `await` | Long-poll until the user approves or sends a directive. |
+| `await` | Rarely needed: long-poll for a click. Normally Claude ends its turn and a click wakes it. |
 
 ### What `init` writes
 
-`.claude-board/` (state plus its own `.gitignore`), the `board` server in `.mcp.json`, hooks, an `mcp__board` allow rule and `MCP_TOOL_TIMEOUT=600000` (unless already set) in `.claude/settings.json`, and a 5-line snippet in `CLAUDE.md`. Hook commands use a quoted forward-slash path, so install folders with spaces work in both bash and cmd. All files are merged, never overwritten, and re-running is safe.
+`.claude-board/` (state plus its own `.gitignore`), the `board` server in `.mcp.json`, hooks (including the background `watch` hook on `SessionStart`, `UserPromptSubmit` and `Stop` that lets a click wake Claude), an `mcp__board` allow rule and `MCP_TOOL_TIMEOUT=600000` (unless already set) in `.claude/settings.json`, and a 5-line snippet in `CLAUDE.md`. Hook commands use a quoted forward-slash path, so install folders with spaces work in both bash and cmd. All files are merged, never overwritten, and re-running is safe.
 
 ### Development
 

@@ -179,8 +179,11 @@ function StepPanel({ st }: { st: Step }) {
 
       <Section>
         <div className="grid grid-cols-2 gap-2">
-          {st.s === 'todo' && <Btn icon="check" tone="done" onClick={() => act({ type: 'approve', id: st.id })}>{t('act.approve')}</Btn>}
-          {st.s === 'block' && <Btn icon="play" tone="done" onClick={() => act({ type: 'approve', id: st.id })}>{t('act.approve')}</Btn>}
+          {(st.s === 'todo' || st.s === 'block') && (
+            <Btn icon="play" tone="done" onClick={() => act({ type: 'approve', id: st.id }, st.id)}>
+              {t('act.approve')}
+            </Btn>
+          )}
           {!container && !['done', 'skip'].includes(st.s) && (
             <Btn icon="scissors" tone="ok" onClick={() => act({ type: 'split', id: st.id }, `split ${st.id}`)}>
               {t('act.split')}
@@ -306,7 +309,10 @@ function StepPanel({ st }: { st: Step }) {
 function AskSection({ st }: { st: Step }) {
   const t = useT();
   const act = useBoard((s) => s.act);
-  const ask = () => act({ type: 'ask', id: st.id });
+  const live = useBoard((s) => s.live());
+  const ask = () => act({ type: 'ask', id: st.id }, st.id);
+  // honest about when the answer comes: in seconds if Claude can be reached, else once it is
+  const pending = t(live ? 'ask.pending' : 'ask.later');
   return (
     <Section>
       {st.a ? (
@@ -323,12 +329,12 @@ function AskSection({ st }: { st: Step }) {
           <div dir="auto" className="leading-relaxed">
             {st.a}
           </div>
-          {st.ask && <div className="mt-1.5 animate-pulse text-[11.5px] text-todo">{t('ask.pending')}</div>}
+          {st.ask && <div className="mt-1.5 animate-pulse text-[11.5px] text-todo">{pending}</div>}
         </div>
       ) : st.ask ? (
         <div className="flex items-center gap-2 rounded-lg bg-todo/10 px-3 py-2.5 text-[13px] text-todo">
           <Icon name="help" size={15} className="animate-pulse" />
-          {t('ask.pending')}
+          {pending}
         </div>
       ) : (
         <button
@@ -390,7 +396,7 @@ function PhasePanel({ ph }: { ph: Phase }) {
       </div>
       {todo > 0 && (
         <Section>
-          <Btn icon="check" tone="done" onClick={() => act({ type: 'approvePhase', id: ph.id })}>
+          <Btn icon="play" tone="done" onClick={() => act({ type: 'approvePhase', id: ph.id }, ph.id)}>
             {t('act.approvePhase')} ({todo})
           </Btn>
         </Section>

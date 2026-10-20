@@ -1,7 +1,10 @@
 // Claude Code hooks. They run as short-lived processes on every event, so this
-// module only touches the core (no server, no MCP SDK).
+// module only touches the core (no server, no MCP SDK). The one long-lived
+// hook is `watch`, which Claude Code runs in the background (asyncRewake).
+import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { fmtDirectives, leaves, takeUnread, unread } from '../core/ops.js';
+import { alive, type Listen } from '../core/listen.js';
+import { fmtDirectives, leaves, now, takeUnread, unread, wakes } from '../core/ops.js';
 import type { State } from '../core/schema.js';
 import { Store } from '../core/store.js';
 import { summary } from '../core/summary.js';
@@ -109,6 +112,71 @@ export function guardDecision(state: State, root: string, input: Pick<HookInput,
   return `Claude Board: ${why}. ${DENY_TAIL}`;
 }
 
+export interface WatchOptions {
+  tick?: number;
+  /** Mid-turn, how long Claude's own board calls get to pick a click up before the watcher steps in. */
+  grace?: number;
+  maxMs?: number;
+  /** Process whose exit ends the watch; defaults to the hook's parent. */
+  parent?: number;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Waits in the background for a board click that needs Claude, takes it from
+ * the inbox and returns the text to wake Claude with. Claude Code runs this
+ * hook with asyncRewake: exit code 2 starts a new turn showing our stderr, so a
+ * click reaches an idle session without the user typing anything.
+ *
+ * One watcher per board: each new one takes over .listen.json and the older
+ * ones notice and leave quietly. Returns undefined when it stops without waking.
+ */
+export async function watchBoard(store: Store, event: string | undefined, o: WatchOptions = {}): Promise<string | undefined> {
+  const tick = o.tick ?? 700;
+  const busy = event === 'UserPromptSubmit';
+  const grace = busy ? (o.grace ?? 15_000) : 0;
+  const parent = o.parent ?? process.ppid;
+  const watchParent = alive(parent);
+  const maxMs = o.maxMs ?? 12 * 3600_000;
+  const id = randomUUID();
+  const mark = (mode: Listen['mode']) => store.writeJson(store.p.listen, { pid: process.pid, id, mode, at: now() });
+  const mine = () => store.readJson<Listen>(store.p.listen)?.id === id;
+
+  // at session start the session-start hook hands over what was already waiting
+  const old = new Set(event === 'SessionStart' ? unread(store.read()).map((d) => d.id) : []);
+  mark(busy ? 'busy' : 'idle');
+  const start = Date.now();
+  let rev = -2;
+  let seen = new Map<string, number>(); // wake-worthy click -> when the watcher first saw it
+
+  for (;;) {
+    if (!mine()) return undefined;
+    if ((watchParent && !alive(parent)) || Date.now() - start > maxMs) return undefined;
+    const r = store.rev();
+    if (r !== rev || seen.size) {
+      try {
+        const s = store.read();
+        rev = r;
+        const t = Date.now();
+        const next = new Map<string, number>();
+        for (const d of unread(s)) if (!old.has(d.id) && wakes(s, d)) next.set(d.id, seen.get(d.id) ?? t);
+        seen = next;
+        if ([...seen.values()].some((first) => t - first >= grace)) {
+          const { state, result: msgs } = store.mutate((st) => takeUnread(st));
+          if (msgs.length) {
+            mark('busy'); // Claude is about to work on it
+            return `the user clicked on the board.\n${summary(state, { usage: store.readUsage(), msgs })}`;
+          }
+        }
+      } catch {
+        // state.json mid-edit or locked: look again on the next tick
+      }
+    }
+    await sleep(tick);
+  }
+}
+
 export async function runHook(name: string) {
   const input = await readStdin();
   const root = findRoot(input.cwd || undefined);
@@ -136,6 +204,14 @@ export async function runHook(name: string) {
     case 'guard': {
       const reason = guardDecision(store.read(), root, input);
       if (reason) emit('PreToolUse', { permissionDecision: 'deny', permissionDecisionReason: reason });
+      return;
+    }
+    case 'watch': {
+      const wake = await watchBoard(store, input.hook_event_name);
+      if (wake) {
+        process.stderr.write(wake + '\n');
+        process.exitCode = 2; // asyncRewake: start a new turn with this text
+      }
       return;
     }
     default:

@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["dist/cli.js", "demo", "--simulate", "--no-open", "--port", "3900"],
       "port": 3900
+    },
+    {
+      "name": "demo-away",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/cli.js", "demo", "--no-open", "--port", "3901"],
+      "port": 3901
     }
   ]
 }

@@ -63,6 +63,8 @@ describe('claude <-> board loop', () => {
     expect(r0.text).toContain('empty board');
     base = /board (http:\/\/\S+)/.exec(r0.text)![1];
     expect(base).toBe(`http://localhost:${PORT}`);
+    // the session is open, but no watcher hook is running in this test to wake Claude
+    expect(((await (await fetch(`${base}/api/state`)).json()) as { claude: string }).claude).toBe('idle');
 
     const p = await call('plan', { name: 'E2E', phases: [{ t: 'Core', steps: ['Edit app', 'Second'] }] });
     expect(p.text).toMatch(/^P1 S1\.1,S1\.2 \| 2 await approval r\d+$/);
@@ -96,7 +98,7 @@ describe('claude <-> board loop', () => {
     writeFileSync(join(t.dir, 'app.ts'), 'export const a = 2;\nexport const b = 3;\n');
     await act({ type: 'note', id: 'S1.2', x: 'keep it tiny' });
     const done = await call('update', { ops: [{ id: 'S1.1', s: 'done', n: 'app edited', t: 'pass' }] });
-    expect(done.text).toContain('wait S1.2 need approval -> await');
+    expect(done.text).toContain('wait S1.2 need approval -> end turn');
     expect(done.text).toContain('msg S1.2 note:"keep it tiny"');
 
     const st = new Store(t.dir).read().steps.find((x) => x.id === 'S1.1')!;

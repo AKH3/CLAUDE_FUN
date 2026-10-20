@@ -4,16 +4,16 @@ import { AddDialog } from './components/AddDialog';
 import { ArchivePanel } from './components/ArchivePanel';
 import { BatchBar } from './components/BatchBar';
 import { Canvas } from './components/Canvas';
-import { CommandsPanel } from './components/CommandsPanel';
 import { DiffModal } from './components/DiffModal';
 import { Icon } from './components/Icon';
 import { Inspector } from './components/Inspector';
-import { ActivityPanel, EmptyState, Toasts } from './components/Panels';
+import { MessagePanel } from './components/MessagePanel';
+import { ActivityPanel, EmptyState, PendingBanner, Toasts } from './components/Panels';
 import { TopBar } from './components/TopBar';
 import { connect } from './sse';
 import { useBoard } from './store';
 
-export type Panel = 'activity' | 'archive' | 'commands';
+export type Panel = 'message' | 'archive' | 'activity';
 
 export function App() {
   const state = useBoard((s) => s.state);
@@ -54,11 +54,12 @@ export function App() {
             <Icon name="alert" size={14} /> {problem}
           </div>
         )}
+        <PendingBanner />
         <main className="relative min-h-0 flex-1 overflow-hidden">
           {state.phases.length ? <Canvas /> : <EmptyState />}
           {panel === 'activity' && <ActivityPanel onClose={close} />}
           {panel === 'archive' && <ArchivePanel onClose={close} />}
-          {panel === 'commands' && <CommandsPanel onClose={close} />}
+          {panel === 'message' && <MessagePanel onClose={close} />}
           <Inspector />
         </main>
         <DiffModal />

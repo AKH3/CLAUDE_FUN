@@ -43,7 +43,10 @@ function MiniBtn({ icon, label, onClick, color }: { icon: Parameters<typeof Icon
   );
 }
 
-/** "?" on a card: asks Claude once, then the cached answer opens for free. */
+/**
+ * "?" on a card. Claude writes the explanation when it plans, so it opens at
+ * once (and shows on hover); older steps ask Claude, which the board wakes.
+ */
 function AskBtn({ st }: { st: Step }) {
   const t = useT();
   const act = useBoard((s) => s.act);
@@ -52,7 +55,7 @@ function AskBtn({ st }: { st: Step }) {
   return (
     <button
       type="button"
-      title={t('act.ask')}
+      title={st.a ?? t('act.ask')}
       aria-label={t('act.ask')}
       className={`nodrag grid size-5 place-items-center rounded-full transition hover:scale-110 ${tone}`}
       onClick={(e) => {
@@ -154,11 +157,21 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps<Ste
           </>
         ) : st.s === 'todo' && !locked ? (
           <>
-            <span className="text-todo">{t('status.todo')}</span>
-            <span className="ms-auto flex gap-1">
+            <span className="truncate text-todo">{t('status.todo')}</span>
+            <span className="ms-auto flex shrink-0 items-center gap-1">
               {pickBtn}
-              <MiniBtn icon="scissors" label={t('act.split')} color="var(--ok)" onClick={() => act({ type: 'split', id: st.id }, `split ${st.id}`)} />
-              <MiniBtn icon="check" label={t('act.approve')} color="var(--done)" onClick={() => act({ type: 'approve', id: st.id })} />
+              <button
+                type="button"
+                title={t('act.approve')}
+                className="nodrag flex items-center gap-1 rounded-md bg-done px-2 py-0.5 text-[12px] font-semibold text-[var(--bg)] transition hover:brightness-110"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  act({ type: 'approve', id: st.id }, st.id);
+                }}
+              >
+                <Icon name="play" size={10} fill />
+                {t('act.start')}
+              </button>
             </span>
           </>
         ) : st.s === 'run' ? (
@@ -274,7 +287,7 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps<PhaseNodeT>
             className="nodrag ms-auto flex items-center gap-1 rounded-md bg-done/15 px-2 py-0.5 font-medium text-done transition hover:bg-done/25"
             onClick={(e) => {
               e.stopPropagation();
-              act({ type: 'approvePhase', id: phase.id });
+              act({ type: 'approvePhase', id: phase.id }, phase.id);
             }}
           >
             <Icon name="check" size={12} />

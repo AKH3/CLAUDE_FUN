@@ -11,6 +11,10 @@ export interface BoardPaths {
   usage: string;
   runtime: string;
   session: string;
+  /** Written by the hooks: is Claude in a turn, and which watcher can wake it. */
+  listen: string;
+  /** Written by the MCP server: pid of the Claude Code session's server. */
+  live: string;
   lock: string;
   tmpIndex: string;
 }
@@ -24,6 +28,8 @@ export function boardPaths(root: string): BoardPaths {
     usage: join(dir, 'usage.json'),
     runtime: join(dir, '.runtime.json'),
     session: join(dir, '.session.json'),
+    listen: join(dir, '.listen.json'),
+    live: join(dir, '.live.json'),
     lock: join(dir, '.lock'),
     tmpIndex: join(dir, 'tmp-index'),
   };

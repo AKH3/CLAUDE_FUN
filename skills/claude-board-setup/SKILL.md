@@ -5,7 +5,7 @@ description: Installs Claude Board (CLAUDE_FUN, the `claude-fun` CLI from github
 
 # Claude Board setup
 
-Claude Board is a local visual board for Claude Code. Claude reports progress through four MCP tools (`resume`, `plan`, `update`, `await`) on a server named `board`, and the user approves each step in a browser page, usually `http://localhost:3000` (the port can differ: the next free one if 3000 is busy, or whatever `--port` sets). Your job is to get it installed and working in the user's project with as little effort from them as possible.
+Claude Board is a local visual board for Claude Code. Claude reports progress through MCP tools (`resume`, `plan`, `update`) on a server named `board`, and the user approves each step in a browser page, usually `http://localhost:3000` (the port can differ: the next free one if 3000 is busy, or whatever `--port` sets). Your job is to get it installed and working in the user's project with as little effort from them as possible.
 
 Reply in the user's language (Arabic if they write Arabic), keep technical names in English, and run every command yourself. Only stop and ask when a step below says so.
 
@@ -107,7 +107,7 @@ Read the output:
 Check that these exist in `<project>`:
 - `.claude-board/state.json`
 - `.mcp.json` with a server named `board`
-- `.claude/settings.json` with hooks that run `claude-fun ... hook session-start`, `hook prompt` and `hook guard`
+- `.claude/settings.json` with hooks that run `claude-fun ... hook session-start`, `hook prompt`, `hook guard` and `hook watch` (the background hook, `asyncRewake`, that lets a board click wake Claude)
 
 Then run:
 
@@ -123,9 +123,11 @@ Claude Code only loads a new MCP server when a session starts, so the board won'
 
 1. Start a new Claude Code session in `<project>`: in the desktop app, a new session with that folder; in a terminal, `cd` into it and run `claude`.
 2. Approve the `board` MCP server (and trust the folder) when Claude Code asks. In a terminal session, `/mcp` should then list `board` as connected.
-3. Run `claude-fun.cmd` in that folder: it opens whichever board is already running for the project, on any port (0.3.2+). Or open the link Claude gives in its first reply; it is usually `http://localhost:3000`, but the board takes the next free port if 3000 is busy.
-4. Ask Claude for a plan, for example «خطط لبناء …». Steps show up on the board and wait for ✓ «اعتماد البدء».
-5. To try the board without a project first: `claude-fun.cmd demo --simulate`.
+3. Open the link Claude gives in its first reply; it is usually `http://localhost:3000`, but the board takes the next free port if 3000 is busy. Or ask Claude «افتح اللوحة», and it runs `claude-fun.cmd`, which opens whichever board is running for the project.
+4. On the empty board, write the idea under «وش تبي تبني؟» and press «أرسل لكلاود», or ask Claude in the chat. Steps show up on the board and wait for «ابدأ». A click wakes Claude within seconds; there is no need to type in the chat.
+5. The top of the board says whether a click reaches Claude now: «كلاود يشتغل», «كلاود جاهز», «كلاود ما يسمع اللوحة» (re-run step 5, then a new session) or «كلاود مو مفتوح» (no session open on the project).
+
+Many users run Claude only from the desktop app and have no terminal, so don't tell them to run commands themselves; offer to run them.
 
 Finish with a short summary: the folder, the CLI version, the files that `init` added, and anything you skipped and why. Point Arabic speakers to the beginner guide: https://github.com/AKH3/CLAUDE_FUN/blob/main/docs/GUIDE-ar.md
 
@@ -143,7 +145,7 @@ When the user asks to update:
 
 4. Run `claude-fun.cmd --version` again. A higher number confirms the update. The same number only means the maintainer didn't bump it, so don't report that as a failure.
 5. For each project the user names, re-run step 5. It's safe on a wired project: it keeps the plan and refreshes the hooks and the `CLAUDE.md` snippet.
-6. Tell the user to start a new Claude Code session in each project so the new `board` server loads.
+6. Tell the user to start a new Claude Code session in each project so the new `board` server and hooks load. Since 0.4.0 the hooks include `watch`, which lets a board click wake Claude; until the new session starts, the board shows «كلاود ما يسمع اللوحة».
 
 ## Removing it from a project
 
@@ -164,4 +166,5 @@ This undoes `init`, backs the touched files up first, and prints the backup loca
 | `... is not a project folder` / `is your home folder` | Wrong target; go back to step 1. |
 | `board` not in `/mcp` | The session was opened in a different folder, or it was started before `init`. Start a new session in `<project>`. |
 | Board stopped working after Node or the CLI moved | Re-run step 5; the hooks store the CLI's absolute path. |
-| `await` returns before the user approves | Expected after a few minutes. Wait for the user to approve, then continue. |
+| Board says «كلاود ما يسمع اللوحة» | The `watch` hook is missing (project wired before 0.4.0) or Claude Code is too old for `asyncRewake`. Re-run step 5, then start a new session. |
+| Board says «كلاود مو مفتوح» | No Claude Code session is open on that project. Clicks are kept and reach Claude once a session opens and the user writes to it. |

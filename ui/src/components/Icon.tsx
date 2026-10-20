@@ -27,6 +27,8 @@ const paths = {
   archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   terminal: 'M4 17l6-5-6-5M12 19h8',
+  chat: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z',
+  sliders: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
 } as const;
 
 export type IconName = keyof typeof paths;

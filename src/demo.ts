@@ -51,9 +51,18 @@ export async function runDemo(opts: { port: number; open: boolean; simulate: boo
 
   if (opts.simulate) {
     let tick = 0;
+    // the fake Claude is always listening, like a real session with the watcher hook
+    let was = '';
+    const listen = (mode: 'busy' | 'idle') => {
+      if (mode !== was) store.writeJson(store.p.listen, { pid: process.pid, id: 'demo', mode, at: now() });
+      was = mode;
+    };
+    listen('idle');
     setInterval(() => {
       tick++;
       const s = store.read();
+      const busy = s.inbox.some((d) => !d.ack) || leaves(s).some((x) => x.s === 'run' || x.s === 'ok');
+      listen(busy ? 'busy' : 'idle');
       const msgs = s.inbox.some((d) => !d.ack) ? store.mutate((st) => takeUnread(st)).result : [];
       for (const m of msgs) {
         if (m.k === 'split' && m.s) store.mutate((st) => applyPlan(st, { parent: m.s, steps: ['تحليل', 'تنفيذ', 'مراجعة'] }));

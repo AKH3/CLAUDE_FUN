@@ -38,7 +38,7 @@ export const StepSchema = z.object({
   un: z.string().optional(), // latest note from the user
   d: z.string().optional(), // optional detail
   e: z.number().int().min(1).max(3).optional(), // effort Claude expects: 1 small, 2 medium, 3 large
-  a: z.string().optional(), // Claude's answer to the user's "?" question
+  a: z.string().optional(), // what the step does and why: written with the plan, or Claude's answer to "?"
   ask: z.boolean().optional(), // a "?" question is waiting for Claude
   q: z.number().optional(), // queue position from a batch start; lower runs first
   arc: z.string().optional(), // when it was archived (only on archived copies)
@@ -105,6 +105,7 @@ export const StepInSchema = z.union([
     deps: z.array(z.string()).optional().describe('ids, or "#n" = nth step in this list'),
     d: z.string().optional(),
     e: z.number().int().min(1).max(3).optional().describe('effort 1-3'),
+    a: z.string().max(300).optional().describe('what it does + why, <=20 words, user language'),
   }),
 ]);
 
@@ -188,6 +189,15 @@ export interface PlanArgs {
   parent?: string;
   steps?: StepIn[];
 }
+
+/**
+ * Can a board click reach Claude right now? (see core/listen.ts)
+ * working: Claude is in a turn and picks clicks up as it goes.
+ * ready:   idle, and a watcher wakes it as soon as you click.
+ * idle:    the session is open but nothing can wake it (hooks missing, or an older Claude Code).
+ * away:    no Claude Code session is open on this project.
+ */
+export type ClaudeStatus = 'working' | 'ready' | 'idle' | 'away';
 
 export interface Usage {
   session?: string;

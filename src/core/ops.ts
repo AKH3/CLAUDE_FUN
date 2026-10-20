@@ -77,7 +77,8 @@ export function fmtDirective(d: Directive): string {
     case 'split':
       return `split ${t}`;
     case 'note':
-      return t ? `${t} note:${q(d.x ?? '', 120)}` : `note:${q(d.x ?? '', 120)}`;
+      // a general note is the user writing to Claude from the board, so it travels whole
+      return t ? `${t} note:${q(d.x ?? '', 120)}` : `note:${q(d.x ?? '', 500)}`;
     case 'prio':
       return `${t} prio ${d.x}`;
     case 'edit':
@@ -98,6 +99,28 @@ export function fmtDirective(d: Directive): string {
 }
 
 export const fmtDirectives = (ds: Directive[]) => ds.map(fmtDirective).join('; ');
+
+/**
+ * Clicks that need Claude now, so the watcher wakes an idle session for them.
+ * The rest (rename, reorder, guard, archive, a note on a step that hasn't
+ * started) can wait for Claude's next turn.
+ */
+export function wakes(s: State, d: Directive): boolean {
+  const st = d.s ? findStep(s, d.s) : undefined;
+  switch (d.k) {
+    case 'ok':
+    case 'ask':
+    case 'split':
+    case 'retry':
+      return true;
+    case 'note':
+      return !d.s || st?.s === 'run';
+    case 'add':
+      return st?.s === 'ok'; // a task the user approved as they added it
+    default:
+      return false;
+  }
+}
 
 // ---------- ids ----------
 
@@ -172,6 +195,7 @@ function addSteps(
       deps,
       d: spec.d,
       e: spec.e,
+      a: spec.a?.trim() || undefined, // the "?" explanation, ready without asking Claude
       by,
       at: {},
     });

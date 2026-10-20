@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { copyText } from '../copy';
 import { useBoard, useT } from '../store';
 import { Icon, type IconName } from './Icon';
 
@@ -18,11 +19,6 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-di
 export function ActivityPanel({ onClose }: { onClose: () => void }) {
   const t = useT();
   const state = useBoard((s) => s.state)!;
-  const act = useBoard((s) => s.act);
-  const [v, setV] = useState('');
-  const send = async () => {
-    if (v.trim() && (await act({ type: 'note', x: v.trim() }, 'note'))) setV('');
-  };
 
   return (
     <aside className="scroll-thin absolute inset-y-0 start-0 z-20 flex w-[min(340px,100vw)] flex-col overflow-y-auto border-e border-line bg-panel shadow-[var(--shadow)]">
@@ -32,25 +28,6 @@ export function ActivityPanel({ onClose }: { onClose: () => void }) {
         <button type="button" onClick={onClose} className="ms-auto grid size-8 place-items-center rounded-lg text-muted hover:bg-panel2" aria-label={t('act.close')}>
           <Icon name="x" size={16} />
         </button>
-      </div>
-      <div className="border-t border-line px-4 py-3">
-        <div className="flex gap-2">
-          <input
-            dir="auto"
-            value={v}
-            onChange={(e) => setV(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
-            placeholder={t('note.general')}
-            className="flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-[13px] outline-none placeholder:text-muted focus:border-ok"
-          />
-          <button type="button" onClick={send} disabled={!v.trim()} className="grid size-9 place-items-center rounded-lg bg-ok text-white disabled:opacity-30" aria-label={t('act.send')}>
-            <Icon name="send" size={15} />
-          </button>
-        </div>
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12.5px]">
-          <input type="checkbox" checked={state.cfg.autoApprove} onChange={(e) => act({ type: 'setCfg', autoApprove: e.target.checked })} className="accent-[var(--ok)]" />
-          {t('autoApprove')}
-        </label>
       </div>
       <ol className="border-t border-line px-2 py-2">
         {[...state.log].reverse().map((l, i) => {
@@ -80,6 +57,7 @@ const TOAST_STYLE: Record<string, { icon: IconName; color: string }> = {
   phase: { icon: 'star', color: 'var(--gold)' },
   plan: { icon: 'list', color: 'var(--ok)' },
   sent: { icon: 'send', color: 'var(--ok)' },
+  later: { icon: 'pause', color: 'var(--todo)' },
   error: { icon: 'alert', color: 'var(--fail)' },
 };
 
@@ -114,37 +92,75 @@ export function Toasts() {
 export function EmptyState() {
   const t = useT();
   const act = useBoard((s) => s.act);
+  const openAdd = useBoard((s) => s.openAdd);
   const [v, setV] = useState('');
+  const send = async () => {
+    const x = v.trim();
+    if (x && (await act({ type: 'note', x: `plan: ${x}` }))) setV('');
+  };
   return (
     <div className="absolute inset-0 grid place-items-center p-6">
-      <div className="w-[min(460px,100%)] rounded-2xl border border-dashed border-line bg-panel/70 p-7 text-center shadow-[var(--shadow)]">
+      <div className="w-[min(480px,100%)] rounded-2xl border border-dashed border-line bg-panel/70 p-7 text-center shadow-[var(--shadow)]">
         <svg viewBox="0 0 32 32" className="mx-auto mb-4 size-12 opacity-80" aria-hidden="true">
           <path d="M16 2 30 16 16 30 2 16Z" fill="none" stroke="var(--run)" strokeWidth="1.5" />
           <path d="M16 9 23 16 16 23 9 16Z" fill="var(--done)" opacity=".6" />
         </svg>
         <h2 className="text-lg font-semibold">{t('empty.title')}</h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-muted">{t('empty.body')}</p>
-        <p className="mt-2 font-mono text-[12.5px] text-ok">{t('empty.cmd')}</p>
-        <div className="mt-5 flex gap-2">
-          <input
-            dir="auto"
-            value={v}
-            onChange={(e) => setV(e.target.value)}
-            onKeyDown={async (e) => e.key === 'Enter' && v.trim() && (await act({ type: 'addPhase', t: v.trim() })) && setV('')}
-            placeholder={t('act.addPhase')}
-            className="flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-[13px] outline-none placeholder:text-muted focus:border-ok"
-          />
-          <button
-            type="button"
-            disabled={!v.trim()}
-            onClick={async () => (await act({ type: 'addPhase', t: v.trim() })) && setV('')}
-            className="grid size-9 place-items-center rounded-lg bg-ok text-white disabled:opacity-30"
-            aria-label={t('act.addPhase')}
-          >
-            <Icon name="plus" size={16} />
-          </button>
-        </div>
+        <textarea
+          dir="auto"
+          rows={3}
+          value={v}
+          maxLength={480}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          placeholder={t('empty.placeholder')}
+          className="mt-5 w-full resize-none rounded-lg border border-line bg-bg px-3 py-2 text-start text-[14px] outline-none placeholder:text-muted focus:border-ok"
+        />
+        <button
+          type="button"
+          disabled={!v.trim()}
+          onClick={send}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-done px-3 py-2 text-[14px] font-semibold text-[var(--bg)] transition hover:brightness-110 disabled:opacity-40"
+        >
+          <Icon name="send" size={15} />
+          {t('empty.send')}
+        </button>
+        <button type="button" onClick={() => openAdd('phase')} className="mt-3 text-[12.5px] text-muted underline-offset-4 hover:text-text hover:underline">
+          {t('empty.manual')}
+        </button>
       </div>
+    </div>
+  );
+}
+
+/** Shown while clicks wait and nothing can wake Claude: says exactly what to type, with a copy button. */
+export function PendingBanner() {
+  const t = useT();
+  const connected = useBoard((s) => s.connected);
+  const claude = useBoard((s) => s.claude);
+  const toast = useBoard((s) => s.toast);
+  const pending = useBoard((s) => s.state?.inbox.filter((d) => !d.ack).length ?? 0);
+  if (!connected || !pending || claude === 'ready' || claude === 'working') return null;
+  const word = t('banner.word');
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-todo/30 bg-todo/12 px-4 py-2 text-[13px]">
+      <Icon name="pause" size={14} className="shrink-0 text-todo" />
+      <span className="font-semibold text-todo">{t('banner.title')}</span>
+      <span>{t(claude === 'away' ? 'banner.away' : 'banner.idle')}</span>
+      <button
+        type="button"
+        onClick={async () => (await copyText(word)) && toast('done', `${t('banner.copy')} ✓`)}
+        className="ms-auto flex items-center gap-1.5 rounded-lg bg-todo/20 px-2.5 py-1 text-[12.5px] font-medium text-todo hover:bg-todo/30"
+      >
+        <Icon name="copy" size={13} />
+        {t('banner.copy')}
+      </button>
     </div>
   );
 }
